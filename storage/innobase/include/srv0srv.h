@@ -59,6 +59,7 @@ struct srv_stats_t {
 	typedef ib_counter_t<lint, 1, single_indexer_t> lint_ctr_1_t;
 	typedef ib_counter_t<ulint, 64> ulint_ctr_64_t;
 	typedef ib_counter_t<ib_int64_t, 1, single_indexer_t> ib_int64_ctr_1_t;
+	typedef ib_counter_t<ulint, 64, get_sched_indexer_t> ulint_cpu_ctr_64_t;
 
 	/** Count the amount of data written in total (in bytes) */
 	ulint_ctr_1_t		data_written;
@@ -129,6 +130,8 @@ struct srv_stats_t {
 	ulint_ctr_1_t		lock_deadlock_count;
 
 	ulint_ctr_1_t		n_lock_max_wait_time;
+
+	ulint_cpu_ctr_64_t	read_views_memory;
 };
 
 extern const char*	srv_main_thread_op_info;
@@ -450,7 +453,6 @@ expected. */
 
 /*-------------------------------------------*/
 
-extern ulint	srv_read_views_memory;
 extern ulint	srv_descriptors_memory;
 
 extern my_bool	srv_print_innodb_monitor;
@@ -1050,7 +1052,7 @@ struct export_var_t{
 	ulint innodb_num_open_files;		/*!< fil_n_file_opened */
 	ulint innodb_truncated_status_writes;	/*!< srv_truncated_status_writes */
 	ulint innodb_available_undo_logs;       /*!< srv_available_undo_logs */
-	ulint innodb_read_views_memory;		/*!< srv_read_views_memory */
+	ulint innodb_read_views_memory;		/*!< srv_stats.read_views_memory */
 	ulint innodb_descriptors_memory;	/*!< srv_descriptors_memory */
 	ib_int64_t innodb_s_lock_os_waits;
 	ib_int64_t innodb_s_lock_spin_rounds;

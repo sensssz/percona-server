@@ -189,8 +189,7 @@ read_view_create_low(
 	if (view == NULL) {
 		view = static_cast<read_view_t*>(
 			ut_malloc(sizeof(read_view_t)));
-		os_atomic_increment_ulint(&srv_read_views_memory,
-					  sizeof(read_view_t));
+		srv_stats.read_views_memory.add(sizeof(read_view_t));
 		view->max_descr = 0;
 		view->descriptors = NULL;
 	}
@@ -200,9 +199,8 @@ read_view_create_low(
 		/* avoid frequent re-allocations by extending the array to the
 		desired size + 10% */
 
-		os_atomic_increment_ulint(&srv_read_views_memory,
-					  (n + n / 10 - view->max_descr) *
-					  sizeof(trx_id_t));
+		srv_stats.read_views_memory.add((n + n / 10 - view->max_descr)
+						* sizeof(trx_id_t));
 		view->max_descr = n + n / 10;
 		view->descriptors = static_cast<trx_id_t*>(
 			ut_realloc(view->descriptors,
@@ -580,9 +578,8 @@ read_view_free(
 		return;
 	}
 
-	os_atomic_decrement_lint(&srv_read_views_memory,
-				 sizeof(read_view_t) +
-				 view->max_descr * sizeof(trx_id_t));
+	srv_stats.read_views_memory.sub(sizeof(read_view_t) +
+					view->max_descr * sizeof(trx_id_t));
 
 	if (view->descriptors != NULL) {
 		ut_free(view->descriptors);

@@ -501,7 +501,6 @@ UNIV_INTERN ulint	srv_available_undo_logs         = 0;
 UNIV_INTERN byte
 counters_pad_start[CACHE_LINE_SIZE] __attribute__((unused)) = {0};
 
-UNIV_INTERN ulint		srv_read_views_memory CACHE_ALIGNED	= 0;
 UNIV_INTERN ulint		srv_descriptors_memory CACHE_ALIGNED	= 0;
 
 UNIV_INTERN byte
@@ -1396,7 +1395,7 @@ srv_printf_innodb_monitor(
 
 	fprintf(file,
 		"Total memory allocated by read views " ULINTPF "\n",
-		os_atomic_increment_lint(&srv_read_views_memory, 0));
+		static_cast<ulint>(srv_stats.read_views_memory));
 
 	/* Calculate AHI constant and variable memory allocations */
 
@@ -1829,9 +1828,8 @@ srv_export_innodb_status(void)
 
 	export_vars.innodb_available_undo_logs = srv_available_undo_logs;
 	export_vars.innodb_read_views_memory
-		= os_atomic_increment_lint(&srv_read_views_memory, 0);
-	export_vars.innodb_descriptors_memory
-		= os_atomic_increment_lint(&srv_descriptors_memory, 0);
+		= static_cast<ulint>(srv_stats.read_views_memory);
+	export_vars.innodb_descriptors_memory = srv_descriptors_memory;
 
 #ifdef UNIV_DEBUG
 	rw_lock_s_lock(&purge_sys->latch);

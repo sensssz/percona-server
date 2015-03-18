@@ -82,6 +82,11 @@ struct thread_id_indexer_t : public generic_indexer_t<Type, N> {
 	}
 };
 
+#ifndef HAVE_SCHED_GETCPU
+template <typename Type, int N>
+struct get_sched_indexer_t : public thread_id_indexer_t<Type, N> { };
+#endif
+
 /** For counters wher N=1 */
 template <typename Type, int N=1>
 struct single_indexer_t {
