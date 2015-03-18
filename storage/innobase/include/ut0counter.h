@@ -59,12 +59,12 @@ struct get_sched_indexer_t : public generic_indexer_t<Type, N> {
 	/* @return result from sched_getcpu(), the thread id if it fails. */
 	size_t get_rnd_index() const UNIV_NOTHROW {
 
-		size_t	cpu = sched_getcpu();
-		if (cpu == -1) {
-			cpu = (lint) os_thread_get_curr_id();
+		int	cpu = sched_getcpu();
+		if (UNIV_UNLIKELY(cpu == -1)) {
+			cpu = (int) os_thread_get_curr_id();
 		}
 
-		return(cpu);
+		return(size_t(cpu));
 	}
 };
 #endif /* HAVE_SCHED_GETCPU */
