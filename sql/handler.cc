@@ -4916,9 +4916,12 @@ void handler::update_global_table_stats()
     return;
 
   TABLE_STATS* table_stats;
-  char key[NAME_LEN * 2 + 2];
+  char key[NAME_LEN * 2 + 2], *key_ptr;
   // [db] + '.' + [table]
-  sprintf(key, "%s.%s", table->s->table_cache_key.str, table->s->table_name.str);
+  key_ptr= stpcpy(key, table->s->table_cache_key.str);
+  *key_ptr++= '.';
+  key_ptr= stpcpy(key_ptr, table->s->table_name.str);
+  DBUG_ASSERT(key_ptr - key < NAME_LEN * 2 + 2);
 
   mysql_mutex_lock(&LOCK_global_table_stats);
   // Gets the global table stats, creating one if necessary.
@@ -4977,10 +4980,14 @@ void handler::update_global_index_stats()
       if (!key_info->name) continue;
 
       INDEX_STATS* index_stats;
-      char key[NAME_LEN * 3 + 3];
+      char key[NAME_LEN * 3 + 3], *key_ptr;
       // [db] + '.' + [table] + '.' + [index]
-      sprintf(key, "%s.%s.%s",  table->s->table_cache_key.str,
-              table->s->table_name.str, key_info->name);
+      key_ptr= stpcpy(key, table->s->table_cache_key.str);
+      *key_ptr++= '.';
+      key_ptr= stpcpy(key_ptr, table->s->table_name.str);
+      *key_ptr++= '.';
+      key_ptr= stpcpy(key_ptr, key_info->name);
+      DBUG_ASSERT(key_ptr - key < NAME_LEN * 3 + 3);
 
       mysql_mutex_lock(&LOCK_global_index_stats);
       // Gets the global index stats, creating one if necessary.

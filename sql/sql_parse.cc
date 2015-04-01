@@ -6803,7 +6803,7 @@ void mysql_parse(THD *thd, char *rawbuf, uint length,
   double start_cpu_nsecs= 0;
   double end_cpu_nsecs=   0;
 
-  if (opt_userstat)
+  if (unlikely(opt_userstat))
   {
 #ifdef HAVE_CLOCK_GETTIME
     /* get start cputime */
@@ -6992,7 +6992,7 @@ void mysql_parse(THD *thd, char *rawbuf, uint length,
     parser_state->m_lip.found_semicolon= NULL;
   }
 
-  if (opt_userstat)
+  if (unlikely(opt_userstat))
   {
     // Gets the end time.
     if (!(end_time_error= gettimeofday(&end_time, NULL)))

@@ -2777,7 +2777,7 @@ void mysqld_stmt_execute(THD *thd, char *packet_arg, uint packet_length)
   double start_cpu_nsecs= 0;
   double end_cpu_nsecs=   0;
 
-  if (opt_userstat)
+  if (unlikely(opt_userstat))
   {
 #ifdef HAVE_CLOCK_GETTIME
     /* get start cputime */
@@ -2820,7 +2820,7 @@ void mysqld_stmt_execute(THD *thd, char *packet_arg, uint packet_length)
                   vio_shutdown(thd->net.vio, SHUT_RDWR););
 
 end:
-  if (opt_userstat)
+  if (unlikely(opt_userstat))
   {
     // Gets the end time.
     if (!(end_time_error= gettimeofday(&end_time, NULL)))
@@ -2966,7 +2966,7 @@ void mysqld_stmt_fetch(THD *thd, char *packet, uint packet_length)
   double start_cpu_nsecs= 0;
   double end_cpu_nsecs=   0;
 
-  if (opt_userstat)
+  if (unlikely(opt_userstat))
   {
 #ifdef HAVE_CLOCK_GETTIME
     /* get start cputime */
@@ -3012,7 +3012,7 @@ void mysqld_stmt_fetch(THD *thd, char *packet, uint packet_length)
   thd->stmt_arena= thd;
 
 end:
-  if (opt_userstat)
+  if (unlikely(opt_userstat))
   {
     // Gets the end time.
     if (!(end_time_error = gettimeofday(&end_time, NULL)))
@@ -3114,7 +3114,7 @@ void mysqld_stmt_reset(THD *thd, char *packet, uint packet_length)
   double start_cpu_nsecs= 0;
   double end_cpu_nsecs=   0;
 
-  if (opt_userstat)
+  if (unlikely(opt_userstat))
   {
 #ifdef HAVE_CLOCK_GETTIME
     /* get start cputime */
@@ -3153,7 +3153,7 @@ void mysqld_stmt_reset(THD *thd, char *packet, uint packet_length)
   my_ok(thd);
 
 end:
-  if (opt_userstat)
+  if (unlikely(opt_userstat))
   {
     // Gets the end time.
     if (!(end_time_error = gettimeofday(&end_time, NULL)))

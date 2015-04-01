@@ -1299,7 +1299,7 @@ bool login_connection(THD *thd)
   thd->reset_stats();
 
   // Updates global user connection stats.
-  if (opt_userstat && increment_connection_count(thd, true))
+  if (unlikely(opt_userstat && increment_connection_count(thd, true)))
     DBUG_RETURN(1);
 
   DBUG_RETURN(0);
