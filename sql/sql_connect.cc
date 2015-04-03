@@ -274,7 +274,7 @@ void init_thread_stats(THREAD_STATS *thread_stats,
 
 void init_global_user_stats(void)
 {
-  if (my_hash_init(&global_user_stats, system_charset_info, max_connections,
+  if (my_hash_init(&global_user_stats, &my_charset_bin, max_connections,
                 0, 0, (my_hash_get_key)get_key_user_stats,
                 (my_hash_free_key)free_user_stats, 0)) {
     sql_print_error("Initializing global_user_stats failed.");
@@ -284,7 +284,7 @@ void init_global_user_stats(void)
 
 void init_global_client_stats(void)
 {
-  if (my_hash_init(&global_client_stats, system_charset_info, max_connections,
+  if (my_hash_init(&global_client_stats, &my_charset_bin, max_connections,
                 0, 0, (my_hash_get_key)get_key_user_stats,
                 (my_hash_free_key)free_user_stats, 0)) {
     sql_print_error("Initializing global_client_stats failed.");
@@ -317,7 +317,7 @@ extern "C" void free_table_stats(TABLE_STATS* table_stats)
 
 void init_global_table_stats(void)
 {
-  if (my_hash_init(&global_table_stats, system_charset_info, max_connections,
+  if (my_hash_init(&global_table_stats, &my_charset_bin, max_connections,
                 0, 0, (my_hash_get_key)get_key_table_stats,
                 (my_hash_free_key)free_table_stats, 0)) {
     sql_print_error("Initializing global_table_stats failed.");
@@ -339,7 +339,7 @@ extern "C" void free_index_stats(INDEX_STATS* index_stats)
 
 void init_global_index_stats(void)
 {
-  if (my_hash_init(&global_index_stats, system_charset_info, max_connections,
+  if (my_hash_init(&global_index_stats, &my_charset_bin, max_connections,
                 0, 0, (my_hash_get_key)get_key_index_stats,
                 (my_hash_free_key)free_index_stats, 0)) {
     sql_print_error("Initializing global_index_stats failed.");
