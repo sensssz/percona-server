@@ -1154,8 +1154,9 @@ buf_LRU_buf_pool_running_out(void)
 
 		buf_pool = buf_pool_from_array(i);
 
+		os_rmb;
 		if (!recv_recovery_is_on()
-		    && UT_LIST_GET_LEN(buf_pool->free)
+		    && buf_pool->free_page_count
 		       + UT_LIST_GET_LEN(buf_pool->LRU)
 		       < ut_min(buf_pool->curr_size,
 				buf_pool->old_size) / 4) {
@@ -1179,20 +1180,16 @@ buf_LRU_get_free_only(
 {
 	buf_block_t*	block;
 
-	mutex_enter(&buf_pool->free_list_mutex);
+	bool free_popped = buf_pool->free.pop(block);
+	if (free_popped) {
+		os_atomic_decrement_ulint(&buf_pool->free_page_count, 1);
+	}
 
-	block = reinterpret_cast<buf_block_t*>(
-		UT_LIST_GET_FIRST(buf_pool->free));
+	while (free_popped) {
 
-	while (block != NULL) {
-
-		ut_ad(block->page.in_free_list);
-		ut_d(block->page.in_free_list = FALSE);
 		ut_ad(!block->page.in_flush_list);
 		ut_ad(!block->page.in_LRU_list);
 		ut_a(!buf_page_in_file(&block->page));
-		UT_LIST_REMOVE(buf_pool->free, &block->page);
-		mutex_exit(&buf_pool->free_list_mutex);
 
 		if (!buf_get_withdraw_depth(buf_pool)
 		    || !buf_block_will_withdrawn(buf_pool, block)) {
@@ -1207,17 +1204,19 @@ buf_LRU_get_free_only(
 		}
 
 		/* This should be withdrawn */
-		mutex_enter(&buf_pool->free_list_mutex);
+		mutex_enter(&buf_pool->withdraw_list_mutex);
 		UT_LIST_ADD_LAST(
 			buf_pool->withdraw,
 			&block->page);
 		ut_d(block->in_withdraw_list = TRUE);
+		mutex_exit(&buf_pool->withdraw_list_mutex);
 
-		block = reinterpret_cast<buf_block_t*>(
-			UT_LIST_GET_FIRST(buf_pool->free));
+		bool free_popped = buf_pool->free.pop(block);
+		if (free_popped) {
+			os_atomic_decrement_ulint(&buf_pool->free_page_count,
+						  1);
+		}
 	}
-
-	mutex_exit(&buf_pool->free_list_mutex);
 
 	return(block);
 }
@@ -1233,9 +1232,10 @@ buf_LRU_check_size_of_non_data_objects(
 /*===================================*/
 	const buf_pool_t*	buf_pool)	/*!< in: buffer pool instance */
 {
+	os_rmb;
 	if (!recv_recovery_is_on()
 	    && buf_pool->curr_size == buf_pool->old_size
-	    && UT_LIST_GET_LEN(buf_pool->free)
+	    && buf_pool->free_page_count
 	    + UT_LIST_GET_LEN(buf_pool->LRU) < buf_pool->curr_size / 20) {
 
 		ib::fatal() << "Over 95 percent of the buffer pool is"
@@ -1250,7 +1250,7 @@ buf_LRU_check_size_of_non_data_objects(
 
 	} else if (!recv_recovery_is_on()
 		   && buf_pool->curr_size == buf_pool->old_size
-		   && (UT_LIST_GET_LEN(buf_pool->free)
+		   && (buf_pool->free_page_count
 		       + UT_LIST_GET_LEN(buf_pool->LRU))
 		   < buf_pool->curr_size / 3) {
 
@@ -2153,7 +2153,6 @@ buf_LRU_block_free_non_file_page(
 #if defined UNIV_AHI_DEBUG || defined UNIV_DEBUG
 	ut_a(block->n_pointers == 0);
 #endif /* UNIV_AHI_DEBUG || UNIV_DEBUG */
-	ut_ad(!block->page.in_free_list);
 	ut_ad(!block->page.in_flush_list);
 	ut_ad(!block->page.in_LRU_list);
 
@@ -2187,18 +2186,17 @@ buf_LRU_block_free_non_file_page(
 	    && buf_block_will_withdrawn(buf_pool, block)) {
 		/* This should be withdrawn */
 		buf_block_set_state(block, BUF_BLOCK_NOT_USED);
-		mutex_enter(&buf_pool->free_list_mutex);
+		mutex_enter(&buf_pool->withdraw_list_mutex);
 		UT_LIST_ADD_LAST(
 			buf_pool->withdraw,
 			&block->page);
 		ut_d(block->in_withdraw_list = TRUE);
-		mutex_exit(&buf_pool->free_list_mutex);
+		mutex_exit(&buf_pool->withdraw_list_mutex);
 	} else {
 		buf_block_set_state(block, BUF_BLOCK_NOT_USED);
-		mutex_enter(&buf_pool->free_list_mutex);
-		UT_LIST_ADD_FIRST(buf_pool->free, &block->page);
-		ut_d(block->page.in_free_list = TRUE);
-		mutex_exit(&buf_pool->free_list_mutex);
+		bool free_pushed = buf_pool->free.push(&block->page);
+		ut_a(free_pushed);
+		os_atomic_increment_ulint(&buf_pool->free_page_count, 1);
 	}
 }
 
@@ -2353,7 +2351,6 @@ buf_LRU_block_remove_hashed(
 
 	switch (buf_page_get_state(bpage)) {
 	case BUF_BLOCK_ZIP_PAGE:
-		ut_ad(!bpage->in_free_list);
 		ut_ad(!bpage->in_flush_list);
 		ut_ad(!bpage->in_LRU_list);
 		ut_a(bpage->zip.data);
@@ -2409,7 +2406,6 @@ buf_LRU_block_remove_hashed(
 			void*	data = bpage->zip.data;
 			bpage->zip.data = NULL;
 
-			ut_ad(!bpage->in_free_list);
 			ut_ad(!bpage->in_flush_list);
 			ut_ad(!bpage->in_LRU_list);
 
@@ -2695,23 +2691,6 @@ buf_LRU_validate_instance(
 	}
 
 	ut_a(buf_pool->LRU_old_len == old_len);
-
-	mutex_exit(&buf_pool->LRU_list_mutex);
-
-	mutex_enter(&buf_pool->free_list_mutex);
-
-	CheckInFreeList::validate(buf_pool);
-
-	for (buf_page_t* bpage = UT_LIST_GET_FIRST(buf_pool->free);
-	     bpage != NULL;
-	     bpage = UT_LIST_GET_NEXT(list, bpage)) {
-
-		ut_a(buf_page_get_state(bpage) == BUF_BLOCK_NOT_USED);
-	}
-
-	mutex_exit(&buf_pool->free_list_mutex);
-
-	mutex_enter(&buf_pool->LRU_list_mutex);
 
 	CheckUnzipLRUAndLRUList::validate(buf_pool);
 

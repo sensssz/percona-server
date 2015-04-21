@@ -882,9 +882,9 @@ sync_latch_meta_init()
 		  SYNC_BUF_LRU_LIST,
 		  buf_pool_LRU_list_mutex_key);
 
-	LATCH_ADD(SrvLatches, "buf_pool_free_list",
+	LATCH_ADD(SrvLatches, "buf_pool_withdraw_list",
 		  SYNC_BUF_FREE_LIST,
-		  buf_pool_free_list_mutex_key);
+		  buf_pool_withdraw_list_mutex_key);
 
 	LATCH_ADD(SrvLatches, "buf_pool_zip_free",
 		  SYNC_BUF_ZIP_FREE,

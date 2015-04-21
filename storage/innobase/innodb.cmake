@@ -356,7 +356,8 @@ ENDIF()
 
 # Include directories under innobase
 INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/storage/innobase/include
-		    ${CMAKE_SOURCE_DIR}/storage/innobase/handler)
+		    ${CMAKE_SOURCE_DIR}/storage/innobase/handler
+                    ${BOOST_INCLUDE_DIR})
 
 # Sun Studio bug with -xO2
 IF(CMAKE_CXX_COMPILER_ID MATCHES "SunPro"

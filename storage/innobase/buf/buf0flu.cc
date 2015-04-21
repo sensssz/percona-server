@@ -1487,16 +1487,16 @@ buf_free_from_unzip_LRU_list_batch(
 {
 	ulint		scanned = 0;
 	ulint		count = 0;
-	ulint		free_len = UT_LIST_GET_LEN(buf_pool->free);
 	ulint		lru_len = UT_LIST_GET_LEN(buf_pool->unzip_LRU);
 
 	ut_ad(mutex_own(&buf_pool->LRU_list_mutex));
 
 	buf_block_t*	block = UT_LIST_GET_LAST(buf_pool->unzip_LRU);
 
+	os_rmb;
 	while (block != NULL
 	       && count < max
-	       && free_len < srv_LRU_scan_depth
+	       && buf_pool->free_page_count < srv_LRU_scan_depth
 	       && lru_len > UT_LIST_GET_LEN(buf_pool->LRU) / 10) {
 
 		BPageMutex*	block_mutex = buf_page_get_mutex(&block->page);
@@ -1518,8 +1518,8 @@ buf_free_from_unzip_LRU_list_batch(
 			block = UT_LIST_GET_PREV(unzip_LRU, block);
 		}
 
-		free_len = UT_LIST_GET_LEN(buf_pool->free);
 		lru_len = UT_LIST_GET_LEN(buf_pool->unzip_LRU);
+		os_rmb;
 	}
 
 	ut_ad(mutex_own(&buf_pool->LRU_list_mutex));
@@ -1564,7 +1564,6 @@ buf_flush_LRU_list_batch(
 	ulint		scanned = 0;
 	ulint		evict_count = 0;
 	ulint		count = 0;
-	ulint		free_len = UT_LIST_GET_LEN(buf_pool->free);
 	ulint		lru_len = UT_LIST_GET_LEN(buf_pool->LRU);
 	ulint		withdraw_depth;
 
@@ -1572,9 +1571,10 @@ buf_flush_LRU_list_batch(
 
 	withdraw_depth = buf_get_withdraw_depth(buf_pool);
 
+	os_rmb;
 	for (bpage = UT_LIST_GET_LAST(buf_pool->LRU);
 	     bpage != NULL && count + evict_count < max
-	     && free_len < srv_LRU_scan_depth + withdraw_depth
+	     && buf_pool->free_page_count < srv_LRU_scan_depth + withdraw_depth
 	     && lru_len > BUF_LRU_MIN_LEN;
 	     ++scanned,
 	     bpage = buf_pool->lru_hp.get()) {
@@ -1616,8 +1616,8 @@ buf_flush_LRU_list_batch(
 		ut_ad(!mutex_own(block_mutex));
 		ut_ad(mutex_own(&buf_pool->LRU_list_mutex));
 
-		free_len = UT_LIST_GET_LEN(buf_pool->free);
 		lru_len = UT_LIST_GET_LEN(buf_pool->LRU);
+		os_rmb;
 	}
 
 	buf_pool->lru_hp.set(NULL);

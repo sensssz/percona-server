@@ -41,6 +41,8 @@ Created 11/5/1995 Heikki Tuuri
 #include "srv0srv.h"
 #include <ostream>
 
+#include <boost/lockfree/queue.hpp>
+
 // Forward declaration
 struct fil_addr_t;
 
@@ -143,7 +145,7 @@ struct buf_pool_info_t{
 	ulint	pool_size;		/*!< Buffer Pool size in pages */
 	ulint	lru_len;		/*!< Length of buf_pool->LRU */
 	ulint	old_lru_len;		/*!< buf_pool->LRU_old_len */
-	ulint	free_list_len;		/*!< Length of buf_pool->free list */
+	ulint	free_list_len;		/*!< Free page count */
 	ulint	flush_list_len;		/*!< Length of buf_pool->flush_list */
 	ulint	n_pend_unzip;		/*!< buf_pool->n_pend_unzip, pages
 					pending decompress */
@@ -1443,14 +1445,6 @@ buf_page_hash_get_low() function.
 #define buf_block_hash_get(b, page_id)				\
 	buf_block_hash_get_locked(b, page_id, NULL, 0)
 
-/*********************************************************************//**
-Gets the current length of the free list of buffer blocks.
-@return length of the free list */
-
-ulint
-buf_get_free_list_len(void);
-/*=======================*/
-
 /********************************************************************//**
 Determine if a block is a sentinel for a buffer pool watch.
 @return TRUE if a sentinel for a buffer pool watch, FALSE if not */
@@ -1634,7 +1628,7 @@ public:
 					corresponding list mutex, in one of the
 					following lists in buf_pool:
 
-					- BUF_BLOCK_NOT_USED:	free, withdraw
+					- BUF_BLOCK_NOT_USED:	none, withdraw
 					- BUF_BLOCK_FILE_PAGE:	flush_list
 					- BUF_BLOCK_ZIP_DIRTY:	flush_list
 					- BUF_BLOCK_ZIP_PAGE:	zip_clean
@@ -1662,10 +1656,6 @@ public:
 					and buf_pool->flush_list_mutex. Hence
 					reads can happen while holding
 					any one of the two mutexes */
-	ibool		in_free_list;	/*!< TRUE if in buf_pool->free; when
-					buf_pool->free_list_mutex is free, the
-					following should hold: in_free_list
-					== (state == BUF_BLOCK_NOT_USED) */
 #endif /* UNIV_DEBUG */
 	lsn_t		newest_modification;
 					/*!< log sequence number of
@@ -2071,7 +2061,8 @@ struct buf_pool_t{
 	/** @name General fields */
 	/* @{ */
 	BufListMutex	LRU_list_mutex; /*!< LRU list mutex */
-	BufListMutex	free_list_mutex;/*!< free and withdraw list mutex */
+	BufListMutex	withdraw_list_mutex;
+					/*!< withdraw_list mutex */
 	BufListMutex	zip_free_mutex; /*!< buddy allocator mutex */
 	BufListMutex	zip_hash_mutex; /*!< zip_hash mutex */
 	ib_mutex_t	flush_state_mutex;/*!< Flush state protection
@@ -2205,16 +2196,16 @@ struct buf_pool_t{
 	/** @name LRU replacement algorithm fields */
 	/* @{ */
 
-	UT_LIST_BASE_NODE_T(buf_page_t) free;
-					/*!< base node of the free
-					block list */
+	boost::lockfree::queue<buf_page_t *> free;
+					/*!< free page queue */
+	ulint		free_page_count;
 
 	UT_LIST_BASE_NODE_T(buf_page_t) withdraw;
 					/*!< base node of the withdraw
 					block list. It is only used during
 					shrinking buffer pool size, not to
 					reuse the blocks will be removed.
-					Protected by free_list_mutex */
+					Protected by withdraw_list_mutex */
 
 	ulint		withdraw_target;/*!< target length of withdraw
 					block list, when withdrawing */
@@ -2423,20 +2414,6 @@ struct	CheckInLRUList {
 	{
 		CheckInLRUList	check;
 		ut_list_validate(buf_pool->LRU, check);
-	}
-};
-
-/** Functor to validate the LRU list. */
-struct	CheckInFreeList {
-	void	operator()(const buf_page_t* elem) const
-	{
-		ut_a(elem->in_free_list);
-	}
-
-	static void validate(const buf_pool_t* buf_pool)
-	{
-		CheckInFreeList	check;
-		ut_list_validate(buf_pool->free, check);
 	}
 };
 

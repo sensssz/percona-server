@@ -26,10 +26,10 @@
 #                           unzipping everything ~3 seconds 485M
 # 8,8M boost_headers.tar.gz unzipping everything <1 second
 
-SET(BOOST_PACKAGE_NAME "boost_1_55_0")
+SET(BOOST_PACKAGE_NAME "boost_1_57_0")
 SET(BOOST_TARBALL "${BOOST_PACKAGE_NAME}.tar.gz")
 SET(BOOST_DOWNLOAD_URL
-  "http://sourceforge.net/projects/boost/files/boost/1.55.0/${BOOST_TARBALL}"
+  "http://sourceforge.net/projects/boost/files/boost/1.57.0/${BOOST_TARBALL}"
   )
 
 MACRO(COULD_NOT_FIND_BOOST)
@@ -196,9 +196,9 @@ IF(NOT BOOST_MAJOR_VERSION EQUAL 10)
   COULD_NOT_FIND_BOOST()
 ENDIF()
 
-IF(NOT BOOST_MINOR_VERSION EQUAL 55)
+IF(NOT BOOST_MINOR_VERSION EQUAL 57)
   MESSAGE(WARNING "Boost minor version found is ${BOOST_MINOR_VERSION} "
-    "we need 55"
+    "we need 57"
     )
   COULD_NOT_FIND_BOOST()
 ENDIF()
@@ -206,4 +206,4 @@ ENDIF()
 MESSAGE(STATUS "BOOST_INCLUDE_DIR ${BOOST_INCLUDE_DIR}")
 
 # We have a limited set of patches/bugfixes here:
-SET(BOOST_PATCHES_DIR "${CMAKE_SOURCE_DIR}/include/boost_1_55_0")
+SET(BOOST_PATCHES_DIR "${CMAKE_SOURCE_DIR}/include/boost_1_57_0")
