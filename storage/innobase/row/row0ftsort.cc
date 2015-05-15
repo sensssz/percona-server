@@ -33,6 +33,7 @@ Created 10/13/2010 Jimmy Yang
 #include "row0row.h"
 #include "btr0cur.h"
 #include "btr0bulk.h"
+#include "btr0sea.h"
 #include "fts0plugin.h"
 
 /** Read the next record to buffer N.
@@ -91,6 +92,7 @@ row_merge_create_fts_sort_index(
 	new_index->cached = TRUE;
 	new_index->parser = index->parser;
 	new_index->is_ngram = index->is_ngram;
+	btr_search_index_init(new_index);
 
 	idx_field = dict_index_get_nth_field(index, 0);
 	charset = fts_index_get_charset(index);

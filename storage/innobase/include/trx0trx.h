@@ -63,13 +63,6 @@ void
 trx_search_latch_release_if_reserved(trx_t* trx);
 
 /**
-Reserve the AHI latch if not already reserved by this transaction.
-@param[in,out] trx		Transaction that may own the AHI latch */
-UNIV_INLINE
-void
-trx_reserve_search_latch_if_not_reserved(trx_t* trx);
-
-/**
 Releases the search latch if the transaction has been hogging it for too long.
 @param[in,out] trx		Transaction that may own the AHI latch */
 UNIV_INLINE
@@ -1373,7 +1366,7 @@ but does NOT protect:
 
 Bear in mind (3) and (4) when using the hash index.
 */
-extern rw_lock_t*	btr_search_latch_temp;
+extern rw_lock_t*	btr_search_latch_arr;
 
 /** Track if a transaction is executing inside InnoDB code. It acts
 like a gate between the Server and InnoDB.  */
@@ -1583,9 +1576,6 @@ private:
 	Transaction instance crossing the handler boundary from the Server. */
 	trx_t*			m_trx;
 };
-
-/** The latch protecting the adaptive search system */
-#define btr_search_latch	(*btr_search_latch_temp)
 
 #ifndef UNIV_NONINL
 #include "trx0trx.ic"

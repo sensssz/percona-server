@@ -34,6 +34,7 @@ Created 4/24/1996 Heikki Tuuri
 #include "mysql_version.h"
 #include "btr0pcur.h"
 #include "btr0btr.h"
+#include "btr0sea.h"
 #include "dict0boot.h"
 #include "dict0crea.h"
 #include "dict0dict.h"
@@ -2151,6 +2152,7 @@ err_len:
 
 	(*index)->id = id;
 	(*index)->page = mach_read_from_4(field);
+	btr_search_index_init(*index);
 	ut_ad((*index)->page);
 	(*index)->merge_threshold = merge_threshold;
 

@@ -185,8 +185,8 @@ btr_cur_search_to_nth_level(
 	btr_cur_t*	cursor, /*!< in/out: tree cursor; the cursor page is
 				s- or x-latched, but see also above! */
 	ulint		has_search_latch,/*!< in: latch mode the caller
-				currently has on btr_search_latch:
-				RW_S_LATCH, or 0 */
+				currently has on the AHI search latch for this
+				index: RW_S_LATCH, or 0 */
 	const char*	file,	/*!< in: file name */
 	ulint		line,	/*!< in: line where called */
 	mtr_t*		mtr);	/*!< in: mtr */

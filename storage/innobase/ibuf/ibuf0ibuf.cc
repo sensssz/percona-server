@@ -555,6 +555,7 @@ ibuf_init_at_db_start(void)
 		"innodb_change_buffer", "CLUST_IND",
 		IBUF_SPACE_ID, DICT_CLUSTERED | DICT_IBUF, 1);
 	ibuf->index->id = DICT_IBUF_ID_MIN + IBUF_SPACE_ID;
+	btr_search_index_init(ibuf->index);
 	ibuf->index->table = dict_mem_table_create(
 		"innodb_change_buffer", IBUF_SPACE_ID, 1, 0, 0);
 	ibuf->index->n_uniq = REC_MAX_N_FIELDS;

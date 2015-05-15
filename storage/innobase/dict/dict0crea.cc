@@ -819,6 +819,7 @@ dict_build_index_def(
 			index->id = 1;
 		}
 	}
+	btr_search_index_init(index);
 
 	/* Inherit the space id from the table; we store all indexes of a
 	table in the same tablespace */

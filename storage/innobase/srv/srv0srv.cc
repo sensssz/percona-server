@@ -1209,9 +1209,13 @@ srv_printf_innodb_monitor(
 	      "-------------------------------------\n", file);
 	ibuf_print(file);
 
-	rw_lock_s_lock(&btr_search_latch);
-	ha_print_info(file, btr_search_sys->hash_index);
-	rw_lock_s_unlock(&btr_search_latch);
+	for (ulint i = 0; i < btr_search_index_num; i++) {
+
+		fprintf(file, "Adaptive hash index partition %lu:\n", i);
+		rw_lock_s_lock(&btr_search_latch_arr[i]);
+		ha_print_info(file, btr_search_sys->hash_tables[i]);
+		rw_lock_s_unlock(&btr_search_latch_arr[i]);
+	}
 
 	fprintf(file,
 		"%.2f hash searches/s, %.2f non-hash searches/s\n",
