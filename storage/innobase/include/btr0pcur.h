@@ -132,20 +132,13 @@ btr_pcur_open_with_no_init_func(
 				PAGE_CUR_LE, not PAGE_CUR_GE, as the latter
 				may end up on the previous page of the
 				record! */
-	ulint		latch_mode,/*!< in: BTR_SEARCH_LEAF, ...;
-				NOTE that if has_search_latch != 0 then
-				we maybe do not acquire a latch on the cursor
-				page, but assume that the caller uses his
-				btr search latch to protect the record! */
+	ulint		latch_mode,/*!< in: BTR_SEARCH_LEAF, ... */
 	btr_pcur_t*	cursor, /*!< in: memory buffer for persistent cursor */
-	ulint		has_search_latch,/*!< in: latch mode the caller
-				currently has on the AHI search latch for this
-				index: RW_S_LATCH, or 0 */
 	const char*	file,	/*!< in: file name */
 	ulint		line,	/*!< in: line where called */
 	mtr_t*		mtr);	/*!< in: mtr */
-#define btr_pcur_open_with_no_init(ix,t,md,l,cur,has,m)			\
-	btr_pcur_open_with_no_init_func(ix,t,md,l,cur,has,__FILE__,__LINE__,m)
+#define btr_pcur_open_with_no_init(ix,t,md,l,cur,m)			\
+	btr_pcur_open_with_no_init_func(ix,t,md,l,cur,__FILE__,__LINE__,m)
 
 /*****************************************************************//**
 Opens a persistent cursor at either end of an index. */

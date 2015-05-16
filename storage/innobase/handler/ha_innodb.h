@@ -902,18 +902,6 @@ innobase_copy_frm_flags_from_table_share(
 	dict_table_t*		innodb_table,	/*!< in/out: InnoDB table */
 	const TABLE_SHARE*	table_share);	/*!< in: table share */
 
-/** Release temporary latches.
-Call this function when mysqld passes control to the client. That is to
-avoid deadlocks on the adaptive hash S-latch possibly held by thd. For more
-documentation, see handler.cc.
-@param[in]	hton	Handlerton.
-@param[in]	thd	MySQL thread.
-@return 0 */
-int
-innobase_release_temporary_latches(
-	handlerton*	hton,
-	THD*		thd);
-
 /** Always normalize table name to lower case on Windows */
 #ifdef _WIN32
 #define normalize_table_name(norm_name, name)           \

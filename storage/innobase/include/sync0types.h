@@ -333,52 +333,6 @@ struct sync_check_functor_t {
 	virtual bool result() const = 0;
 };
 
-/** Functor to check whether the calling thread owns the btr search mutex. */
-struct btrsea_sync_check : public sync_check_functor_t {
-
-	explicit btrsea_sync_check(bool has_search_latch)
-		:
-		m_result(),
-		m_has_search_latch(has_search_latch) { }
-
-	virtual ~btrsea_sync_check() { }
-
-	virtual bool operator()(const latch_t& latch)
-	{
-		/* If calling thread doesn't hold search latch then
-		check if there are latch level exception provided.
-
-		Note: Optimizer has added InnoDB intrinsic table as an
-		alternative to MyISAM intrinsic table.
-		With this a new path/workflow came into existence that is
-		Server -> Plugin -> SE
-		Plugin in this case is I_S which is sharing the latch vector
-		of InnoDB and so there could be lock conflicts.
-		Ideally Plugin should use difference namespace latch vector
-		as it doesn't have any depedency with SE latching protocol.
-
-		Added check that will allow thread to hold I_S latches */
-		if (!m_has_search_latch
-		    && (latch.m_level != SYNC_SEARCH_SYS
-			&& latch.m_level != SYNC_FTS_CACHE
-			&& latch.m_level != SYNC_TRX_I_S_RWLOCK
-			&& latch.m_level != SYNC_TRX_I_S_LAST_READ)) {
-			m_result = true;
-			return(m_result);
-		}
-
-		return(false);
-	}
-
-	virtual bool result() const
-	{
-		return(m_result);
-	}
-
-	bool		m_result;
-	bool		m_has_search_latch;
-};
-
 /** Functor to check for dictionay latching constraints. */
 struct dict_sync_check : public sync_check_functor_t {
 

@@ -1333,12 +1333,6 @@ def_week_frmt: %lu, in_trans: %d, autocommit: %d",
                           (int)flags.autocommit));
 
     /*
-     Make InnoDB to release the adaptive hash index latch before
-     acquiring the query cache mutex.
-    */
-    ha_release_temporary_latches(thd);
-
-    /*
       A table- or a full flush operation can potentially take a long time to
       finish. We choose not to wait for them and skip caching statements
       instead.

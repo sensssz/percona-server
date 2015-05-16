@@ -33,6 +33,7 @@ Created 1/8/1996 Heikki Tuuri
 
 #include "btr0pcur.h"
 #include "btr0btr.h"
+#include "btr0sea.h"
 #include "page0page.h"
 #include "mach0data.h"
 #include "dict0boot.h"

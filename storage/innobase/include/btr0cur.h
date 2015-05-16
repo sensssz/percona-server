@@ -176,17 +176,9 @@ btr_cur_search_to_nth_level(
 				BTR_DELETE, or BTR_ESTIMATE;
 				cursor->left_block is used to store a pointer
 				to the left neighbor page, in the cases
-				BTR_SEARCH_PREV and BTR_MODIFY_PREV;
-				NOTE that if has_search_latch
-				is != 0, we maybe do not have a latch set
-				on the cursor page, we assume
-				the caller uses his search latch
-				to protect the record! */
+				BTR_SEARCH_PREV and BTR_MODIFY_PREV */
 	btr_cur_t*	cursor, /*!< in/out: tree cursor; the cursor page is
-				s- or x-latched, but see also above! */
-	ulint		has_search_latch,/*!< in: latch mode the caller
-				currently has on the AHI search latch for this
-				index: RW_S_LATCH, or 0 */
+				s- or x-latched */
 	const char*	file,	/*!< in: file name */
 	ulint		line,	/*!< in: line where called */
 	mtr_t*		mtr);	/*!< in: mtr */

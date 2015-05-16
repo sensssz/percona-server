@@ -55,20 +55,6 @@ class ReadView;
 /** Dummy session used currently in MySQL interface */
 extern sess_t*	trx_dummy_sess;
 
-/**
-Releases the search latch if trx has reserved it.
-@param[in,out] trx		Transaction that may own the AHI latch */
-UNIV_INLINE
-void
-trx_search_latch_release_if_reserved(trx_t* trx);
-
-/**
-Releases the search latch if the transaction has been hogging it for too long.
-@param[in,out] trx		Transaction that may own the AHI latch */
-UNIV_INLINE
-void
-trx_search_latch_timeout(trx_t* trx);
-
 /******************************************************************//**
 Set detailed error message for the transaction. */
 void
@@ -1075,19 +1061,6 @@ struct trx_t {
 					flush the log in
 					trx_commit_complete_for_mysql() */
 	ulint		duplicates;	/*!< TRX_DUP_IGNORE | TRX_DUP_REPLACE */
-	bool		has_search_latch;
-					/*!< TRUE if this trx has latched the
-					search system latch in S-mode */
-	ulint		search_latch_timeout;
-					/*!< If we notice that someone is
-					waiting for our S-lock on the search
-					latch to be released, we wait in
-					row0sel.cc for BTR_SEA_TIMEOUT new
-					searches until we try to keep
-					the search latch again over
-					calls from MySQL; this is intended
-					to reduce contention on the search
-					latch */
 	trx_dict_op_t	dict_operation;	/**< @see enum trx_dict_op_t */
 
 	/* Fields protected by the srv_conc_mutex. */
@@ -1464,10 +1437,6 @@ private:
 			return;
 		}
 
-		/* Only the owning thread should release the latch. */
-
-		trx_search_latch_release_if_reserved(trx);
-
 		trx_mutex_enter(trx);
 
 		wait(trx);
@@ -1517,10 +1486,6 @@ private:
 
 			return;
 		}
-
-		/* Only the owning thread should release the latch. */
-
-		trx_search_latch_release_if_reserved(trx);
 
 		trx_mutex_enter(trx);
 

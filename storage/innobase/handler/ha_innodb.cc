@@ -1256,9 +1256,6 @@ innobase_srv_conc_exit_innodb(
 	row_prebuilt_t*	prebuilt)
 {
 	trx_t*			trx = prebuilt->trx;
-	btrsea_sync_check	check(trx->has_search_latch);
-
-	ut_ad(!sync_check_iterate(check));
 
 	/* This is to avoid making an unnecessary function call. */
 	if (trx->declared_to_be_inside_innodb
@@ -1276,10 +1273,6 @@ innobase_srv_conc_force_exit_innodb(
 /*================================*/
 	trx_t*	trx)	/*!< in: transaction handle */
 {
-	btrsea_sync_check	check(trx->has_search_latch);
-
-	ut_ad(!sync_check_iterate(check));
-
 	/* This is to avoid making an unnecessary function call. */
 	if (trx->declared_to_be_inside_innodb) {
 		srv_conc_force_exit_innodb(trx);
@@ -1434,34 +1427,6 @@ add_table_to_thread_cache(
 
 	innodb_session_t*& priv = thd_to_innodb_session(thd);
 	priv->register_table_handler(table->name.m_name, table);
-}
-
-/********************************************************************//**
-Call this function when mysqld passes control to the client. That is to
-avoid deadlocks on the adaptive hash S-latch possibly held by thd. For more
-documentation, see handler.cc.
-@return 0 */
-inline
-int
-innobase_release_temporary_latches(
-/*===============================*/
-	handlerton*	hton,	/*!< in: handlerton */
-	THD*		thd)	/*!< in: MySQL thread */
-{
-	DBUG_ASSERT(hton == innodb_hton_ptr);
-
-	if (!innodb_inited) {
-
-		return(0);
-	}
-
-	trx_t*	trx = thd_to_trx(thd);
-
-	if (trx != NULL) {
-		trx_search_latch_release_if_reserved(trx);
-	}
-
-	return(0);
 }
 
 /********************************************************************//**
@@ -2582,15 +2547,6 @@ innobase_query_caching_of_table_permitted(
 		return(static_cast<my_bool>(false));
 	}
 
-	if (trx->has_search_latch) {
-		sql_print_error("The calling thread is holding the adaptive"
-				" search, latch though calling"
-				" innobase_query_caching_of_table_permitted.");
-		trx_print(stderr, trx, 1024);
-	}
-
-	trx_search_latch_release_if_reserved(trx);
-
 	innobase_srv_conc_force_exit_innodb(trx);
 
 	if (!thd_test_options(thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN)) {
@@ -2851,8 +2807,6 @@ ha_innobase::init_table_handle_for_HANDLER(void)
 	/* Initialize the m_prebuilt struct much like it would be inited in
 	external_lock */
 
-	trx_search_latch_release_if_reserved(m_prebuilt->trx);
-
 	innobase_srv_conc_force_exit_innodb(m_prebuilt->trx);
 
 	/* If the transaction is not started yet, start it */
@@ -3041,8 +2995,6 @@ innobase_init(
 	innobase_hton->flags =
 		HTON_SUPPORTS_EXTENDED_KEYS | HTON_SUPPORTS_FOREIGN_KEYS;
 
-	innobase_hton->release_temporary_latches =
-		innobase_release_temporary_latches;
         innobase_hton->replace_native_transaction_in_thd =
                 innodb_replace_trx_in_thd;
 	innobase_hton->data = &innodb_api_cb;
@@ -3915,11 +3867,7 @@ innobase_rollback_trx(
 	DBUG_ENTER("innobase_rollback_trx");
 	DBUG_PRINT("trans", ("aborting transaction"));
 
-	/* Release a possible FIFO ticket and search latch. Since we will
-	reserve the trx_sys->mutex, we have to release the search system
-	latch first to obey the latching order. */
-
-	trx_search_latch_release_if_reserved(trx);
+	/* Release a possible FIFO ticket. */
 
 	innobase_srv_conc_force_exit_innodb(trx);
 
@@ -4980,12 +4928,6 @@ ha_innobase::open(
 	UT_NOT_USED(mode);
 	UT_NOT_USED(test_if_locked);
 
-	thd = ha_thd();
-
-	if (thd != NULL) {
-		innobase_release_temporary_latches(ht, thd);
-	}
-
 	normalize_table_name(norm_name, name);
 
 	m_user_thd = NULL;
@@ -5006,6 +4948,8 @@ ha_innobase::open(
 #else
 	is_part = strstr(norm_name, "#P#");
 #endif /* _WIN32 */
+
+	thd = ha_thd();
 
 	/* Check whether FOREIGN_KEY_CHECKS is set to 0. If so, the table
 	can be opened even if some FK indexes are missing. If not, the table
@@ -5417,12 +5361,6 @@ ha_innobase::close()
 /*================*/
 {
 	DBUG_ENTER("ha_innobase::close");
-
-	THD*	thd = ha_thd();
-
-	if (thd != NULL) {
-		innobase_release_temporary_latches(ht, thd);
-	}
 
 	row_prebuilt_free(m_prebuilt, FALSE);
 
@@ -10351,7 +10289,6 @@ create_table_info_t::prepare_create_table(
 	const char*		name)
 {
 	int		error;
-	trx_t*		parent_trx;
 
 	DBUG_ENTER("prepare_create_table");
 
@@ -10394,15 +10331,6 @@ create_table_info_t::prepare_create_table(
 		DBUG_RETURN(-1);
 	}
 
-	/* Get the transaction associated with the current thd, or create one
-	if not yet created */
-
-	parent_trx = check_trx_exists(m_thd);
-
-	/* In case MySQL calls this in the middle of a SELECT query, release
-	possible adaptive hash latch to avoid deadlocks of threads */
-
-	trx_search_latch_release_if_reserved(parent_trx);
 	DBUG_RETURN(0);
 }
 
@@ -11336,15 +11264,6 @@ innobase_create_tablespace(
 		DBUG_RETURN(convert_error_code_to_mysql(err, 0, NULL));
 	}
 
-	/* Get the transaction associated with the current thd and make
-	sure it will not block this DDL. */
-	trx_t*	parent_trx = check_trx_exists(thd);
-
-	/* In case MySQL calls this in the middle of a SELECT
-	query, release possible adaptive hash latch to avoid
-	deadlocks of threads */
-	trx_search_latch_release_if_reserved(parent_trx);
-
 	/* Allocate a new transaction for this DDL */
 	trx = innobase_trx_allocate(thd);
 	++trx->will_lock;
@@ -11428,15 +11347,6 @@ innobase_drop_tablespace(
 	if (!dict_tablespace_is_empty(space_id)) {
 		DBUG_RETURN(HA_ERR_TABLESPACE_IS_NOT_EMPTY);
 	}
-
-	/* Get the transaction associated with the current thd and make sure
-	it will not block this DDL. */
-	trx_t*	parent_trx = check_trx_exists(thd);
-
-	/* In case MySQL calls this in the middle of a SELECT
-	query, release possible adaptive hash latch to avoid
-	deadlocks of threads */
-	trx_search_latch_release_if_reserved(parent_trx);
 
 	/* Allocate a new transaction for this DDL */
 	trx = innobase_trx_allocate(thd);
@@ -11560,19 +11470,6 @@ innobase_drop_database(
 		return;
 	}
 
-	THD*	thd = current_thd;
-
-	/* In the Windows plugin, thd = current_thd is always NULL */
-	if (thd != NULL) {
-		trx_t*	parent_trx = check_trx_exists(thd);
-
-		/* In case MySQL calls this in the middle of a SELECT
-		query, release possible adaptive hash latch to avoid
-		deadlocks of threads */
-
-		trx_search_latch_release_if_reserved(parent_trx);
-	}
-
 	ulint	len = 0;
 	char*	ptr = strend(path) - 2;
 
@@ -11592,7 +11489,7 @@ innobase_drop_database(
 	innobase_casedn_str(namebuf);
 #endif /* _WIN32 */
 
-	trx_t*	trx = innobase_trx_allocate(thd);
+	trx_t*	trx = innobase_trx_allocate(current_thd);
 
 	/* Either the transaction is already flagged as a locking transaction
 	or it hasn't been started yet. */
@@ -12410,8 +12307,6 @@ ha_innobase::info_low(
 
 	m_prebuilt->trx->op_info = (char*)"returning various info to MySQL";
 
-	trx_search_latch_release_if_reserved(m_prebuilt->trx);
-
 	ib_table = m_prebuilt->table;
 	DBUG_ASSERT(ib_table->n_ref_count > 0);
 
@@ -13172,12 +13067,6 @@ ha_innobase::get_foreign_key_create_info(void)
 	update_thd(ha_thd());
 
 	m_prebuilt->trx->op_info = (char*)"getting info on foreign keys";
-
-	/* In case MySQL calls this in the middle of a SELECT query,
-	release possible adaptive hash latch to avoid
-	deadlocks of threads */
-
-	trx_search_latch_release_if_reserved(m_prebuilt->trx);
 
 	if (!srv_read_only_mode) {
 		mutex_enter(&srv_dict_tmpfile_mutex);
@@ -14046,8 +13935,6 @@ innodb_show_status(
 	}
 
 	trx_t*	trx = check_trx_exists(thd);
-
-	trx_search_latch_release_if_reserved(trx);
 
 	innobase_srv_conc_force_exit_innodb(trx);
 
@@ -14930,11 +14817,7 @@ innobase_xa_prepare(
 
 	thd_get_xid(thd, (MYSQL_XID*) trx->xid);
 
-	/* Release a possible FIFO ticket and search latch. Since we will
-	reserve the trx_sys->mutex, we have to release the search system
-	latch first to obey the latching order. */
-
-	trx_search_latch_release_if_reserved(trx);
+	/* Release a possible FIFO ticket. */
 
 	innobase_srv_conc_force_exit_innodb(trx);
 

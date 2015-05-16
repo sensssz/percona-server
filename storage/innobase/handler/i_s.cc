@@ -711,11 +711,11 @@ fill_innodb_trx_from_cache(
 
 		/* trx_adaptive_hash_latched */
 		OK(fields[IDX_TRX_ADAPTIVE_HASH_LATCHED]->store(
-			   static_cast<double>(row->trx_has_search_latch)));
+			   static_cast<double>(0)));
 
 		/* trx_adaptive_hash_timeout */
-		OK(fields[IDX_TRX_ADAPTIVE_HASH_TIMEOUT]->store(
-			   (longlong) row->trx_search_latch_timeout, true));
+		OK(fields[IDX_TRX_ADAPTIVE_HASH_TIMEOUT]->store((longlong) 0,
+								true));
 
 		/* trx_is_read_only*/
 		OK(fields[IDX_TRX_READ_ONLY]->store(

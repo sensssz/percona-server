@@ -274,12 +274,6 @@ ha_rows filesort(THD *thd, QEP_TAB *qep_tab, Filesort *filesort,
                        const_cast<char*>(table->s->table_name.str));
   DEBUG_SYNC(thd, "filesort_start");
 
-  /*
-   Release InnoDB's adaptive hash index latch (if holding) before
-   running a sort.
-  */
-  ha_release_temporary_latches(thd);
-
   /* 
     Don't use table->sort in filesort as it is also used by 
     QUICK_INDEX_MERGE_SELECT. Work with a copy and put it back at the end 

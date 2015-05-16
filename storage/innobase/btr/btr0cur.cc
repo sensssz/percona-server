@@ -730,17 +730,9 @@ btr_cur_search_to_nth_level(
 				BTR_DELETE, or BTR_ESTIMATE;
 				cursor->left_block is used to store a pointer
 				to the left neighbor page, in the cases
-				BTR_SEARCH_PREV and BTR_MODIFY_PREV;
-				NOTE that if has_search_latch
-				is != 0, we maybe do not have a latch set
-				on the cursor page, we assume
-				the caller uses his search latch
-				to protect the record! */
+				BTR_SEARCH_PREV and BTR_MODIFY_PREV */
 	btr_cur_t*	cursor, /*!< in/out: tree cursor; the cursor page is
-				s- or x-latched, but see also above! */
-	ulint		has_search_latch,/*!< in: info on the latch mode the
-				caller currently has on the AHI latch for this
-				index: RW_S_LATCH, or 0 */
+				s- or x-latched */
 	const char*	file,	/*!< in: file name */
 	ulint		line,	/*!< in: line where called */
 	mtr_t*		mtr)	/*!< in: mtr */
@@ -906,14 +898,12 @@ btr_cur_search_to_nth_level(
 	    && mode != PAGE_CUR_LE_OR_EXTENDS
 # endif /* PAGE_CUR_LE_OR_EXTENDS */
 	    && !dict_index_is_spatial(index)
-	    /* If !has_search_latch, we do a dirty read of
-	    btr_search_enabled below, and btr_search_guess_on_hash()
-	    will have to check it again. */
+	    /* We do a dirty read of btr_search_enabled below, and
+	    btr_search_guess_on_hash() will have to check it again. */
 	    && UNIV_LIKELY(btr_search_enabled)
 	    && !modify_external
 	    && btr_search_guess_on_hash(index, info, tuple, mode,
-					latch_mode, cursor,
-					has_search_latch, mtr)) {
+					latch_mode, cursor, mtr)) {
 
 		/* Search using the hash index succeeded */
 
@@ -933,11 +923,6 @@ btr_cur_search_to_nth_level(
 
 	/* If the hash search did not succeed, do binary search down the
 	tree */
-
-	if (has_search_latch) {
-		/* Release possible search latch to obey latching order */
-		rw_lock_s_unlock(btr_search_get_latch(cursor->index));
-	}
 
 	/* Store the position of the tree latch we push to mtr so that we
 	know how to release it when we have latched leaf node(s) */
@@ -1911,11 +1896,6 @@ func_exit:
 	if (retrying_for_search_prev) {
 		ut_free(prev_tree_blocks);
 		ut_free(prev_tree_savepoints);
-	}
-
-	if (has_search_latch) {
-
-		rw_lock_s_lock(btr_search_get_latch(cursor->index));
 	}
 
 	if (mbr_adj) {
@@ -5598,8 +5578,7 @@ btr_estimate_n_rows_in_range(
 
 		btr_cur_search_to_nth_level(index, 0, tuple1, mode1,
 					    BTR_SEARCH_LEAF | BTR_ESTIMATE,
-					    &cursor, 0,
-					    __FILE__, __LINE__, &mtr);
+					    &cursor, __FILE__, __LINE__, &mtr);
 	} else {
 		btr_cur_open_at_index_side(true, index,
 					   BTR_SEARCH_LEAF | BTR_ESTIMATE,
@@ -5616,8 +5595,7 @@ btr_estimate_n_rows_in_range(
 
 		btr_cur_search_to_nth_level(index, 0, tuple2, mode2,
 					    BTR_SEARCH_LEAF | BTR_ESTIMATE,
-					    &cursor, 0,
-					    __FILE__, __LINE__, &mtr);
+					    &cursor, __FILE__, __LINE__, &mtr);
 	} else {
 		btr_cur_open_at_index_side(false, index,
 					   BTR_SEARCH_LEAF | BTR_ESTIMATE,

@@ -130,8 +130,6 @@ trx_init(
 
 	trx->lock.n_rec_locks = 0;
 
-	trx->search_latch_timeout = BTR_SEA_TIMEOUT;
-
 	trx->dict_operation = TRX_DICT_OP_NONE;
 
 	trx->table_id = 0;
@@ -255,10 +253,9 @@ struct TrxFactory {
 		ut_a(trx->lock.wait_lock == NULL);
 		ut_a(trx->lock.wait_thr == NULL);
 
-		ut_a(!trx->has_search_latch);
 #ifdef UNIV_SYNC_DEBUG
 		ut_ad(!btr_search_own_any());
-#enduf
+#endif
 
 		ut_a(trx->dict_operation_lock_mode == 0);
 
@@ -328,7 +325,6 @@ struct TrxFactory {
 		ut_a(trx->lock.wait_thr == NULL);
 		ut_a(trx->lock.wait_lock == NULL);
 
-		ut_a(!trx->has_search_latch);
 #ifdef UNIV_SYNC_DEBUG
 		ut_ad(!btr_search_own_any());
 #endif
@@ -2603,11 +2599,6 @@ state_ok:
 			(ulong) n_trx_locks,
 			(ulong) heap_size,
 			(ulong) n_rec_locks);
-	}
-
-	if (trx->has_search_latch) {
-		newline = TRUE;
-		fputs(", holds adaptive hash latch", f);
 	}
 
 	if (trx->undo_no != 0) {

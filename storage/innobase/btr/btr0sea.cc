@@ -110,12 +110,12 @@ btr_search_build_page_hash_index(
 /********************************************************************//**
 Returns the adaptive hash index table for a given index key.
 @return the adaptive hash index table for a given index key */
+__attribute__((pure,warn_unused_result))
 static
 hash_table_t*
 btr_search_get_hash_table(
 /*======================*/
 	const dict_index_t*	index)	/*!< in: index */
-	__attribute__((pure,warn_unused_result))
 {
 	ut_ad(index);
 	ut_ad(index->search_table);
@@ -737,14 +737,6 @@ ibool
 btr_search_check_guess(
 /*===================*/
 	btr_cur_t*	cursor,	/*!< in: guessed cursor position */
-	ibool		can_only_compare_to_cursor_rec,
-				/*!< in: if we do not have a latch on the page
-				of cursor, but only a latch on the AHI search
-				latch, then ONLY the columns of the record
-				UNDER the cursor are protected, not the next or
-				previous record in the chain: we cannot look at
-				the next or previous record to check our
-				guess! */
 	const dtuple_t*	tuple,	/*!< in: data tuple */
 	ulint		mode,	/*!< in: PAGE_CUR_L, PAGE_CUR_LE, PAGE_CUR_G,
 				or PAGE_CUR_GE */
@@ -798,12 +790,6 @@ btr_search_check_guess(
 		if (cmp <= 0) {
 			goto exit_func;
 		}
-	}
-
-	if (can_only_compare_to_cursor_rec) {
-		/* Since we could not determine if our guess is right just by
-		looking at the record under the cursor, return FALSE */
-		goto exit_func;
 	}
 
 	match = 0;
@@ -899,17 +885,8 @@ btr_search_guess_on_hash(
 	btr_search_t*	info,		/*!< in: index search info */
 	const dtuple_t*	tuple,		/*!< in: logical record */
 	ulint		mode,		/*!< in: PAGE_CUR_L, ... */
-	ulint		latch_mode,	/*!< in: BTR_SEARCH_LEAF, ...;
-					NOTE that only if has_search_latch
-					is 0, we will have a latch set on
-					the cursor page, otherwise we assume
-					the caller uses his search latch
-					to protect the record! */
+	ulint		latch_mode,	/*!< in: BTR_SEARCH_LEAF, ... */
 	btr_cur_t*	cursor,		/*!< out: tree cursor */
-	ulint		has_search_latch,/*!< in: latch mode the caller
-					currently has on the AHI search latch
-					for this index: RW_S_LATCH, RW_X_LATCH,
-				        or 0 */
 	mtr_t*		mtr)		/*!< in: mtr */
 {
 	const rec_t*	rec;
@@ -952,29 +929,22 @@ btr_search_guess_on_hash(
 	cursor->fold = fold;
 	cursor->flag = BTR_CUR_HASH;
 
-	if (!has_search_latch) {
-		rw_lock_s_lock(btr_search_get_latch(index));
+	rw_lock_s_lock(btr_search_get_latch(index));
 
-		if (!btr_search_enabled) {
-			rw_lock_s_unlock(btr_search_get_latch(index));
+	if (!btr_search_enabled) {
+		rw_lock_s_unlock(btr_search_get_latch(index));
 
-			btr_search_failure(info, cursor);
+		btr_search_failure(info, cursor);
 
-			return(FALSE);
-		}
+		return(FALSE);
 	}
-
-	ut_ad(rw_lock_get_writer(btr_search_get_latch(index)) != RW_LOCK_X);
-	ut_ad(rw_lock_get_reader_count(btr_search_get_latch(index)) > 0);
 
 	rec = (rec_t*) ha_search_and_get_data(
 		btr_search_get_hash_table(index), fold);
 
 	if (rec == NULL) {
 
-		if (!has_search_latch) {
-			rw_lock_s_unlock(btr_search_get_latch(index));
-		}
+		rw_lock_s_unlock(btr_search_get_latch(index));
 
 		btr_search_failure(info, cursor);
 
@@ -983,34 +953,25 @@ btr_search_guess_on_hash(
 
 	buf_block_t*	block = buf_block_align(rec);
 
-	if (!has_search_latch) {
-
-		if (!buf_page_get_known_nowait(
-			latch_mode, block, BUF_MAKE_YOUNG,
-			__FILE__, __LINE__, mtr)) {
-
-			if (!has_search_latch) {
-				rw_lock_s_unlock(btr_search_get_latch(index));
-			}
-
-			btr_search_failure(info, cursor);
-
-			return(FALSE);
-		}
+	if (!buf_page_get_known_nowait(latch_mode, block, BUF_MAKE_YOUNG,
+				       __FILE__, __LINE__, mtr)) {
 
 		rw_lock_s_unlock(btr_search_get_latch(index));
 
-		buf_block_dbg_add_level(block, SYNC_TREE_NODE_FROM_HASH);
+		btr_search_failure(info, cursor);
+
+		return(FALSE);
 	}
+
+	rw_lock_s_unlock(btr_search_get_latch(index));
+
+	buf_block_dbg_add_level(block, SYNC_TREE_NODE_FROM_HASH);
 
 	if (buf_block_get_state(block) != BUF_BLOCK_FILE_PAGE) {
 
 		ut_ad(buf_block_get_state(block) == BUF_BLOCK_REMOVE_HASH);
 
-		if (!has_search_latch) {
-
-			btr_leaf_page_release(block, latch_mode, mtr);
-		}
+		btr_leaf_page_release(block, latch_mode, mtr);
 
 		btr_search_failure(info, cursor);
 
@@ -1029,13 +990,9 @@ btr_search_guess_on_hash(
 	record to determine if our guess for the cursor position is
 	right. */
 	if (index_id != btr_page_get_index_id(block->frame)
-	    || !btr_search_check_guess(cursor,
-				       has_search_latch,
-				       tuple, mode, mtr)) {
+	    || !btr_search_check_guess(cursor, tuple, mode, mtr)) {
 
-		if (!has_search_latch) {
-			btr_leaf_page_release(block, latch_mode, mtr);
-		}
+		btr_leaf_page_release(block, latch_mode, mtr);
 
 		btr_search_failure(info, cursor);
 
@@ -1053,13 +1010,10 @@ btr_search_guess_on_hash(
 
 	info->last_hash_succ = FALSE;
 
-	/* Currently, does not work if the following fails: */
-	ut_ad(!has_search_latch);
-
 	btr_leaf_page_release(block, latch_mode, mtr);
 
 	btr_cur_search_to_nth_level(
-		index, 0, tuple, mode, latch_mode, &cursor2, 0, mtr);
+		index, 0, tuple, mode, latch_mode, &cursor2, mtr);
 
 	if (mode == PAGE_CUR_GE
 	    && page_rec_is_supremum(btr_cur_get_rec(&cursor2))) {
@@ -1087,11 +1041,6 @@ btr_search_guess_on_hash(
 #ifdef UNIV_SEARCH_PERF_STAT
 	btr_search_n_succ++;
 #endif
-	if (!has_search_latch && buf_page_peek_if_too_old(&block->page)) {
-
-		buf_page_make_young(&block->page);
-	}
-
 	/* Increment the page get statistics though we did not really
 	fix the page: for user info only */
 

@@ -111,10 +111,6 @@ btr_search_guess_on_hash(
 	ulint		mode,		/*!< in: PAGE_CUR_L, ... */
 	ulint		latch_mode,	/*!< in: BTR_SEARCH_LEAF, ... */
 	btr_cur_t*	cursor,		/*!< out: tree cursor */
-	ulint		has_search_latch,/*!< in: latch mode the caller
-					currently has on the AHI search latch
-					for this index: RW_S_LATCH, RW_X_LATCH,
-					or 0 */
 	mtr_t*		mtr);		/*!< in: mtr */
 /********************************************************************//**
 Moves or deletes hash entries for moved records. If new_page is already hashed,
@@ -321,11 +317,6 @@ pattern */
 /** Limit of consecutive searches for trying a search shortcut using
 the hash index */
 #define BTR_SEARCH_ON_HASH_LIMIT	3
-
-/** We do this many searches before trying to keep the search latch
-over calls from MySQL. If we notice someone waiting for the latch, we
-again set this much timeout. This is to reduce contention. */
-#define BTR_SEA_TIMEOUT			10000
 
 #ifndef UNIV_NONINL
 #include "btr0sea.ic"

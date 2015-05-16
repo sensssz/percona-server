@@ -781,7 +781,6 @@ struct handlerton
                             enum_binlog_command binlog_command,
                             const char *query, uint query_length,
                             const char *db, const char *table_name);
-   int (*release_temporary_latches)(handlerton *hton, THD *thd);
 
    int (*discover)(handlerton *hton, THD* thd, const char *db, 
                    const char *name,
@@ -3793,9 +3792,6 @@ bool ha_check_if_supported_system_table(handlerton *hton, const char* db,
 extern "C" int ha_init_key_cache(const char *name, KEY_CACHE *key_cache);
 int ha_resize_key_cache(KEY_CACHE *key_cache);
 int ha_change_key_cache(KEY_CACHE *old_key_cache, KEY_CACHE *new_key_cache);
-
-/* report to InnoDB that control passes to the client */
-int ha_release_temporary_latches(THD *thd);
 
 /* transactions: interface to handlerton functions */
 int ha_start_consistent_snapshot(THD *thd);
