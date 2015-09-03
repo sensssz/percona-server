@@ -567,7 +567,7 @@ Variable_name	Value
 auto_increment_increment	65535
 auto_increment_offset	65535
 INSERT INTO t1 VALUES (NULL),(NULL);
-ERROR 22003: Out of range value for column 't1' at row 167
+ERROR HY000: Failed to read auto-increment value from storage engine
 SELECT * FROM t1;
 c1
 1

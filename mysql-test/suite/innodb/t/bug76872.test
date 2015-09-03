@@ -1,0 +1,38 @@
+#
+# Test for bug #76872: InnoDB AUTO_INCREMENT produces same value twice
+#
+--source include/have_innodb.inc
+--source include/have_debug_sync.inc
+--source include/count_sessions.inc
+
+# Should be != 0
+SELECT @@innodb_autoinc_lock_mode;
+
+CREATE TABLE `test` (
+  `test_id` int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `testcol` varchar(256)
+) ENGINE=InnoDB;
+
+INSERT INTO `test` (`testcol`) VALUES ('aldsldjfhasjk');
+
+SET SESSION auto_increment_increment = 2;
+SET DEBUG_SYNC="ib_after_row_insert SIGNAL insert_1_ready WAIT_FOR insert_1_finish";
+send INSERT INTO `test` (`testcol`) VALUES ('aldsldjfhasjk');
+--connect(con1,localhost,root,,)
+--connection con1
+SET SESSION auto_increment_increment = 2;
+SET DEBUG_SYNC="now WAIT_FOR insert_1_ready";
+SET DEBUG_SYNC="ib_before_row_insert SIGNAL insert_1_finish WAIT_FOR insert_2_finish";
+send INSERT INTO `test` (`testcol`) VALUES ('aldsldjfhasjk');
+--connection default
+reap;
+SET DEBUG_SYNC="now SIGNAL insert_2_finish";
+--connection con1
+reap;
+--disconnect con1
+--connection default
+
+SELECT * FROM test;
+
+DROP TABLE test;
+--source include/wait_until_count_sessions.inc

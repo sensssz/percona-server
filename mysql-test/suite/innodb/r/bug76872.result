@@ -1,0 +1,22 @@
+SELECT @@innodb_autoinc_lock_mode;
+@@innodb_autoinc_lock_mode
+1
+CREATE TABLE `test` (
+`test_id` int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+`testcol` varchar(256)
+) ENGINE=InnoDB;
+INSERT INTO `test` (`testcol`) VALUES ('aldsldjfhasjk');
+SET SESSION auto_increment_increment = 2;
+SET DEBUG_SYNC="ib_after_row_insert SIGNAL insert_1_ready WAIT_FOR insert_1_finish";
+INSERT INTO `test` (`testcol`) VALUES ('aldsldjfhasjk');
+SET SESSION auto_increment_increment = 2;
+SET DEBUG_SYNC="now WAIT_FOR insert_1_ready";
+SET DEBUG_SYNC="ib_before_row_insert SIGNAL insert_1_finish WAIT_FOR insert_2_finish";
+INSERT INTO `test` (`testcol`) VALUES ('aldsldjfhasjk');
+SET DEBUG_SYNC="now SIGNAL insert_2_finish";
+SELECT * FROM test;
+test_id	testcol
+1	aldsldjfhasjk
+3	aldsldjfhasjk
+5	aldsldjfhasjk
+DROP TABLE test;
