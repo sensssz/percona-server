@@ -14,15 +14,12 @@ count(*)
 set auto_increment_increment=1000;
 set auto_increment_offset=700;
 insert into t1 values(null);
-ERROR 22003: Out of range value for column 'a' at row 1
+Got one of the listed errors
 select count(*) from t1;
 count(*)
 0
 set @@sql_mode=@org_mode;
 insert into t1 values(null);
-Warnings:
-Warning	1264	Out of range value for column 'a' at row 1
 select * from t1;
 a
-127
 drop table t1;

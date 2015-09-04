@@ -7330,6 +7330,7 @@ no_commit:
 
 	innobase_srv_conc_enter_innodb(prebuilt->trx);
 
+	DEBUG_SYNC(user_thd, "ib_before_row_insert");
 	error = row_insert_for_mysql((byte*) record, prebuilt);
 	DEBUG_SYNC(user_thd, "ib_after_row_insert");
 
@@ -14047,6 +14048,13 @@ ha_innobase::get_auto_increment(
 		}
 
 		set_if_bigger(*first_value, autoinc);
+
+		/* Honor increment and offset or handler will do that for us,
+		clobbering unused autoinc value past the end of interval */
+		set_if_bigger(*first_value,
+			      compute_next_insert_id(*first_value - 1,
+						     increment, offset));
+
 	/* Not in the middle of a mult-row INSERT. */
 	} else if (prebuilt->autoinc_last_value == 0) {
 		set_if_bigger(*first_value, autoinc);

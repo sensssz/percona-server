@@ -14,7 +14,7 @@ count(*)
 set auto_increment_increment=1000;
 set auto_increment_offset=700;
 insert into t1 values(null);
-ERROR 22003: Out of range value for column 'a' at row 1
+Got one of the listed errors
 select count(*) from t1;
 count(*)
 0

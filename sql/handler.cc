@@ -3294,23 +3294,8 @@ int handler::read_first_row(uchar * buf, uint primary_key)
 inline ulonglong
 compute_next_insert_id(ulonglong nr,struct system_variables *variables)
 {
-  const ulonglong save_nr= nr;
-
-  if (variables->auto_increment_increment == 1)
-    nr= nr + 1; // optimization of the formula below
-  else
-  {
-    nr= (((nr+ variables->auto_increment_increment -
-           variables->auto_increment_offset)) /
-         (ulonglong) variables->auto_increment_increment);
-    nr= (nr* (ulonglong) variables->auto_increment_increment +
-         variables->auto_increment_offset);
-  }
-
-  if (unlikely(nr <= save_nr))
-    return ULONGLONG_MAX;
-
-  return nr;
+  return compute_next_insert_id(nr, variables->auto_increment_increment,
+                                variables->auto_increment_offset);
 }
 
 
@@ -3551,7 +3536,12 @@ int handler::update_auto_increment()
         it. Hope that this rounding didn't push us out of the interval; even
         if it did we cannot do anything about it (calling the engine again
         will not help as we inserted no row).
+        Assert that this rounding is a no-op for InnoDB, which should respect
+        offset and increment. Otherwise we can go outside the interval and
+        result in duplicate key errors, see bug 76872.
       */
+      DBUG_ASSERT(compute_next_insert_id(nr - 1, variables) == nr
+                  || ht->db_type != DB_TYPE_INNODB);
       nr= compute_next_insert_id(nr-1, variables);
     }
 

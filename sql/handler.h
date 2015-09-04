@@ -3490,6 +3490,39 @@ static inline bool ha_storage_engine_is_enabled(const handlerton *db_type)
          (db_type->state == SHOW_OPTION_YES) : FALSE;
 }
 
+/**
+   Generate the next auto-increment number based on increment and offset.
+   computes the lowest number
+   - strictly greater than "nr"
+   - of the form: auto_increment_offset + N * auto_increment_increment
+   If overflow happened then return MAX_ULONGLONG value as an
+   indication of overflow.
+   In most cases increment= offset= 1, in which case we get:
+   @verbatim 1,2,3,4,5,... @endverbatim
+   If increment=10 and offset=5 and previous number is 1, we get:
+   @verbatim 1,5,15,25,35,... @endverbatim
+*/
+inline ulonglong
+compute_next_insert_id(ulonglong nr, ulonglong auto_increment_increment,
+                       ulonglong auto_increment_offset)
+{
+  const ulonglong save_nr= nr;
+
+  if (auto_increment_increment == 1)
+    nr= nr + 1; // optimization of the formula below
+  else
+  {
+    nr= (((nr + auto_increment_increment - auto_increment_offset)) /
+         auto_increment_increment);
+    nr= (nr * auto_increment_increment + auto_increment_offset);
+  }
+
+  if (unlikely(nr <= save_nr))
+    return ULONGLONG_MAX;
+
+  return nr;
+}
+
 /* basic stuff */
 int ha_init_errors(void);
 int ha_init(void);
