@@ -1521,7 +1521,6 @@ log_preflush_pool_modified_pages(
 
 		if (srv_flush_sync) {
 			/* wake page cleaner for IO burst */
-			// TODO laurynas: backoff?
 			buf_flush_request_force(new_oldest);
 		}
 

@@ -159,6 +159,16 @@ connection default;
 DROP USER plug;
 
 --echo #
+--echo # 5.6 tests
+--echo #
+
+--echo #
+--echo # Interaction with ALTER USER
+--echo #
+--error ER_CANNOT_USER
+ALTER USER 'frank'@'localhost' PASSWORD EXPIRE;
+
+--echo #
 --echo # 5.7 tests
 --echo #
 
@@ -191,3 +201,9 @@ disconnect frank;
 connection default;
 
 SET @@global.offline_mode = @global_saved_tmp;
+
+--echo #
+--echo # Interaction with SHOW CREATE USER
+--echo #
+--error ER_CANNOT_USER
+SHOW CREATE USER 'frank'@'localhost';

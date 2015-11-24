@@ -1,0 +1,9 @@
+--source include/have_partition.inc
+
+create TABLE t1(a int key,b int) ENGINE=InnoDB;
+CREATE VIEW v1 AS SELECT 1 FROM t1 WHERE b=(SELECT a FROM t1 LIMIT 1);
+DROP TABLE t1;
+CREATE TABLE t1(a int,b int,c int,d int,KEY (a,b,c)) ENGINE=InnoDB PARTITION BY KEY (a,b);
+CHECK TABLE test.v1, test.t1;
+
+DROP TABLE
