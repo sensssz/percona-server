@@ -292,7 +292,6 @@ log_online_read_bitmap_page(
 	     <= bitmap_file->size - MODIFIED_PAGE_BLOCK_SIZE);
 	ut_a(bitmap_file->offset % MODIFIED_PAGE_BLOCK_SIZE == 0);
 
-	// TODO laurynas: appropriate request type?
 	IORequest io_request(IORequest::LOG | IORequest::READ);
 	success = os_file_read(io_request, bitmap_file->file, page,
 			       bitmap_file->offset, MODIFIED_PAGE_BLOCK_SIZE);
@@ -903,9 +902,9 @@ log_online_is_valid_log_seg(
 
 	if (!checksum_is_ok) {
 
-		// TODO laurynas: all zero check is a hack to paper over
-		// unwritten log data read! Should be removed
-		/* All zeros? */
+		// We are reading empty log blocks in some cases (such as
+		// tracking log on server startup with log resizing). Such
+		// blocks are benign, silently accept them.
 		byte zero_block[OS_FILE_LOG_BLOCK_SIZE] = { 0 };
 		if (!memcmp(log_block, zero_block, OS_FILE_LOG_BLOCK_SIZE))
 			return true;
@@ -1002,11 +1001,6 @@ log_online_follow_log_seg(
 
 	ut_ad(mutex_own(&log_bmp_sys->mutex));
 
-	// TODO laurynas: assert below should hold after the server startup
-#if 0
-	ut_ad(ut_uint64_align_down(block_start_lsn, OS_FILE_LOG_BLOCK_SIZE)
-	      >= ut_uint64_align_down(srv_start_lsn, OS_FILE_LOG_BLOCK_SIZE));
-#endif
 	log_mutex_enter();
 	log_group_read_log_seg(log_bmp_sys->read_buf, group, block_start_lsn,
 			       block_end_lsn, true);
@@ -1117,8 +1111,7 @@ log_online_write_bitmap_page(
 	/* Simulate a write error */
 	DBUG_EXECUTE_IF("bitmap_page_write_error", return false;);
 
-	// TODO laurynas: correct type?
-	IORequest io_request(IORequest::WRITE);
+	IORequest io_request(IORequest::WRITE | IORequest::NO_COMPRESSION);
 	success = os_file_write(io_request, log_bmp_sys->out.name,
 				log_bmp_sys->out.file, block,
 				log_bmp_sys->out.offset,
