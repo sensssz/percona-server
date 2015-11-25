@@ -4381,6 +4381,12 @@ a file name for --log-bin-index option", opt_binlog_index_name);
             enforce_storage_engine);
         }
       }
+      if (ha_is_storage_engine_disabled(hton))
+      {
+        sql_print_error("enforced storage engine %s is among disabled storage "
+                        "engines", enforce_storage_engine);
+        unireg_abort(1);
+      }
       plugin_unlock(0, defplugin);
       plugin_unlock(0, plugin);
     }
