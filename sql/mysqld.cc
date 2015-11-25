@@ -6828,7 +6828,7 @@ int show_threadpool_idle_threads(THD *thd, SHOW_VAR *var, char *buff)
 {
   var->type= SHOW_INT;
   var->value= buff;
-  *(int *)buff= tp_get_idle_thread_count(); 
+  *(int *)buff= tp_get_idle_thread_count();
   return 0;
 }
 #endif

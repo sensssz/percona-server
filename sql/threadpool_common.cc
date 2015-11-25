@@ -124,7 +124,7 @@ static void threadpool_net_before_header_psi_noop(struct st_net * /* net */,
                                                   size_t /* count */)
 { }
 
-void threadpool_init_net_server_extension(THD *thd)
+static void threadpool_init_net_server_extension(THD *thd)
 {
 #ifdef HAVE_PSI_INTERFACE
   // socket_connection.cc:init_net_server_extension should have been called
