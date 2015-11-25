@@ -19735,8 +19735,8 @@ static MYSQL_SYSVAR_ENUM(empty_free_list_algorithm,
   "LEGACY: (default) Original Oracle MySQL 5.6 handling with single page flushes; "
   "BACKOFF: Wait until cleaner produces a free page.",
   NULL, NULL, SRV_EMPTY_FREE_LIST_LEGACY,
-  // TODO laurynas: default changed until separate LRU flusher is merged. With
-  // a single page cleaner otherwise it is possible to loop forever in a query
+  // Default changed until separate LRU flusher is merged. With a single page
+  // cleaner otherwise it is possible to loop forever in a query
   // thread while the cleaner is waiting for the page latch held by that
   // thread. See sys_vars.log_slow_admin_statements_func in 5.7.5.
   &innodb_empty_free_list_algorithm_typelib);
