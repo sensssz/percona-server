@@ -149,10 +149,21 @@ static void query_response_time_audit_notify(MYSQL_THD thd,
       thd->lex->sql_command;
     if (sql_command == SQLCOM_EXECUTE)
     {
-      LEX_STRING *name= &thd->lex->prepared_stmt_name;
-      Statement *stmt=
-        (Statement *)thd->stmt_map.find_by_name(name);
-      sql_command= stmt->lex->sql_command;
+      if (thd->sp_runtime_ctx && thd->stmt_arena)
+        sql_command= SQLCOM_SELECT;
+      else
+      {
+        LEX_STRING *name= &thd->lex->prepared_stmt_name;
+        if (name)
+        {
+          Statement *stmt=
+            (Statement *)thd->stmt_map.find_by_name(name);
+          sql_command= (stmt && stmt->lex)
+            ? stmt->lex->sql_command : SQLCOM_SELECT;
+        }
+        else
+          sql_command= SQLCOM_SELECT;
+      }
     }
     QUERY_TYPE query_type=
       (sql_command_flags[sql_command] & CF_CHANGES_DATA) ? WRITE : READ;
