@@ -23,6 +23,8 @@ The database buffer replacement algorithm
 Created 11/5/1995 Heikki Tuuri
 *******************************************************/
 
+#define FIX_OPTION_2
+
 #include "buf0lru.h"
 #ifdef UNIV_NONINL
 #include "buf0lru.ic"
@@ -1155,15 +1157,21 @@ bool
 buf_LRU_scan_and_free_block(
 /*========================*/
 	buf_pool_t*	buf_pool,	/*!< in: buffer pool instance */
-	bool		scan_all)	/*!< in: scan whole LRU list
+	bool		scan_all,	/*!< in: scan whole LRU list
 					if true, otherwise scan only
 					BUF_LRU_SEARCH_SCAN_THRESHOLD
 					blocks. */
+	bool		try_mutex)
 {
 	bool	freed = false;
 	bool	use_unzip_list = UT_LIST_GET_LEN(buf_pool->unzip_LRU) > 0;
 
-	mutex_enter(&buf_pool->LRU_list_mutex);
+	if (try_mutex) {
+		if (mutex_enter_nowait(&buf_pool->LRU_list_mutex))
+			return(false);
+	} else {
+		mutex_enter(&buf_pool->LRU_list_mutex);
+	}
 
 	if (use_unzip_list) {
 		freed = buf_LRU_free_from_unzip_LRU_list(buf_pool, scan_all);
@@ -1402,6 +1410,16 @@ loop:
 	MONITOR_INC( MONITOR_LRU_GET_FREE_LOOPS );
 
 	freed = false;
+
+#ifdef FIX_OPTION_1
+	freed = buf_LRU_scan_and_free_block(buf_pool, false, false);
+	if (freed)
+		goto loop;
+#elif defined(FIX_OPTION_2)
+	freed = buf_LRU_scan_and_free_block(buf_pool, false, true);
+	if (freed)
+		goto loop;
+#endif
 
 	if (srv_empty_free_list_algorithm == SRV_EMPTY_FREE_LIST_BACKOFF
 	    && buf_lru_manager_is_active

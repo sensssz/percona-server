@@ -98,9 +98,10 @@ bool
 buf_LRU_scan_and_free_block(
 /*========================*/
 	buf_pool_t*	buf_pool,	/*!< in: buffer pool instance */
-	bool		scan_all)	/*!< in: scan whole LRU list
+	bool		scan_all,	/*!< in: scan whole LRU list
 					if true, otherwise scan only
 					'old' blocks. */
+	bool		try_mutex = false)
 	__attribute__((nonnull,warn_unused_result));
 /******************************************************************//**
 Returns a free block from the buf_pool.  The block is taken off the
