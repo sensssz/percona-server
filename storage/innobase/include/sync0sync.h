@@ -74,6 +74,7 @@ extern mysql_pfs_key_t	ibuf_bitmap_mutex_key;
 extern mysql_pfs_key_t	ibuf_mutex_key;
 extern mysql_pfs_key_t	ibuf_pessimistic_insert_mutex_key;
 extern mysql_pfs_key_t	log_bmp_sys_mutex_key;
+extern mysql_pfs_key_t	log_marker_sys_mutex_key;
 extern mysql_pfs_key_t	log_sys_mutex_key;
 extern mysql_pfs_key_t	log_sys_write_mutex_key;
 extern mysql_pfs_key_t	log_cmdq_mutex_key;
@@ -141,6 +142,7 @@ extern	mysql_pfs_key_t	dict_table_stats_key;
 extern  mysql_pfs_key_t trx_sys_rw_lock_key;
 extern  mysql_pfs_key_t hash_table_locks_key;
 extern  mysql_pfs_key_t master_key_id_mutex_key;
+extern	mysql_pfs_key_t	recv_spaces_lock_key;
 #endif /* UNIV_PFS_RWLOCK */
 
 /** Prints info of the sync system.

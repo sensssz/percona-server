@@ -28,6 +28,7 @@ Created 11/26/1995 Heikki Tuuri
 #include "buf0buf.h"
 #include "buf0flu.h"
 #include "fsp0sysspace.h"
+#include "log0markers.h"
 #include "page0types.h"
 #include "mtr0log.h"
 #include "log0log.h"
@@ -954,6 +955,8 @@ mtr_t::Command::execute()
 		log_flush_order_mutex_enter();
 	}
 
+	lsn_t	lsn = log_sys->lsn;
+
 	/* It is now safe to release the log mutex because the
 	flush_order mutex will ensure that we are the first one
 	to insert into the flush list. */
@@ -968,6 +971,9 @@ mtr_t::Command::execute()
 	}
 
 	release_latches();
+
+	if (m_impl->m_log_mode != MTR_LOG_NO_REDO)
+		log_markers_maybe_mark(lsn);
 
 	release_resources();
 }

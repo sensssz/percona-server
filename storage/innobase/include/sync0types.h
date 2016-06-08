@@ -239,6 +239,7 @@ enum latch_level_t {
 	SYNC_LOG,
 	SYNC_LOG_ONLINE,
 	SYNC_LOG_WRITE,
+	SYNC_LOG_MARKER_SYS,
 	SYNC_PAGE_CLEANER,
 	SYNC_PURGE_QUEUE,
 	SYNC_TRX_SYS_HEADER,
@@ -290,6 +291,8 @@ enum latch_level_t {
 
 	SYNC_TRX_I_S_RWLOCK,
 
+	SYNC_RECV_SPACES,
+
 	/** Level is varying. Only used with buffer pool page locks, which
 	do not have a fixed level, but instead have their level set after
 	the page is locked; see e.g.  ibuf_bitmap_get_map_page(). */
@@ -333,6 +336,7 @@ enum latch_id_t {
 	LATCH_ID_LOG_SYS,
 	LATCH_ID_LOG_ONLINE,
 	LATCH_ID_LOG_WRITE,
+	LATCH_ID_LOG_MARKER_SYS,
 	LATCH_ID_LOG_FLUSH_ORDER,
 	LATCH_ID_LIST,
 	LATCH_ID_MUTEX_LIST,
@@ -397,6 +401,7 @@ enum latch_id_t {
 	LATCH_ID_BUF_CHUNK_MAP_LATCH,
 	LATCH_ID_SYNC_DEBUG_MUTEX,
 	LATCH_ID_MASTER_KEY_ID_MUTEX,
+	LATCH_ID_RECV_SPACES,
 	LATCH_ID_TEST_MUTEX,
 	LATCH_ID_MAX = LATCH_ID_TEST_MUTEX
 };

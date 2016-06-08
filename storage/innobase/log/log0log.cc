@@ -45,6 +45,7 @@ Created 12/9/1995 Heikki Tuuri
 #ifndef UNIV_HOTBACKUP
 #include "buf0flu.h"
 #include "srv0srv.h"
+#include "log0markers.h"
 #include "log0recv.h"
 #include "fil0fil.h"
 #include "dict0boot.h"
@@ -2429,6 +2430,7 @@ loop:
 		fil_write_flushed_lsn(lsn);
 	}
 
+	log_markers_close();
 	fil_close_all_files();
 
 	/* Make some checks that the server really is quiet */

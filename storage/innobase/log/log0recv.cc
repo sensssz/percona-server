@@ -55,6 +55,8 @@ Created 9/20/1997 Heikki Tuuri
 #include "fsp0sysspace.h"
 #include "ut0new.h"
 #include "row0trunc.h"
+#include "log0markers.h"
+#include "sync0sync.h"	// recv_spaces_lock_key
 #ifndef UNIV_HOTBACKUP
 # include "buf0rea.h"
 # include "srv0srv.h"
@@ -198,6 +200,7 @@ typedef std::map<
 	ut_allocator<std::pair<const ulint, file_name_t> > >	recv_spaces_t;
 
 static recv_spaces_t	recv_spaces;
+static rw_lock_t*	recv_spaces_lock = NULL;
 
 /** Process a file name from a MLOG_FILE_* record.
 @param[in,out]	name		file name
@@ -233,9 +236,22 @@ fil_name_process(
 
 	os_normalize_path(name);
 	file_name_t	fname(std::string(name, len - 1), deleted);
+
+	// TODO laurynas assert recv_sys->mlog_checkpoint_lsn -> 1st single threaded scan
+	if (recv_sys->mlog_checkpoint_lsn != 0)
+		rw_lock_x_lock(recv_spaces_lock);
+
 	std::pair<recv_spaces_t::iterator,bool> p = recv_spaces.insert(
 		std::make_pair(space_id, fname));
+	ib::info() << "recv_sys->mlog_checkpoint_lsn = " << recv_sys->mlog_checkpoint_lsn;
+	ib::info() << "inserting (" << space_id << ", " << fname.name << ", "
+		   << fname.deleted << ")";
+	ib::info() << "inserted: " << p.second;
 	ut_ad(p.first->first == space_id);
+	ut_ad(!p.second || recv_sys->mlog_checkpoint_lsn != 0);
+
+	if (recv_sys->mlog_checkpoint_lsn != 0)
+		rw_lock_x_unlock(recv_spaces_lock);
 
 	file_name_t&	f = p.first->second;
 
@@ -253,6 +269,8 @@ fil_name_process(
 		ut_ad(f.space == NULL);
 	} else if (p.second // the first MLOG_FILE_NAME or MLOG_FILE_RENAME2
 		   || f.name != fname.name) {
+
+		ut_ad(recv_sys->mlog_checkpoint_lsn == 0 || !p.second);
 		fil_space_t*	space;
 
 		/* Check if the tablespace file exists and contains
@@ -329,6 +347,7 @@ fil_name_process(
 				Enable some more diagnostics when
 				forcing recovery. */
 
+				ut_ad(recv_sys->mlog_checkpoint_lsn == 0);
 				ib::info()
 					<< "At LSN: " << recv_sys->recovered_lsn
 					<< ": unable to open file " << name
@@ -802,6 +821,11 @@ recv_sys_create(void)
 
 	recv_sys->heap = NULL;
 	recv_sys->addr_hash = NULL;
+
+	recv_spaces_lock = static_cast<rw_lock_t *>(
+		ut_malloc_nokey(sizeof(*recv_spaces_lock)));
+	rw_lock_create(recv_spaces_lock_key, recv_spaces_lock,
+		       SYNC_RECV_SPACES);
 }
 
 /********************************************************//**
@@ -827,7 +851,6 @@ recv_sys_close(void)
 			os_event_destroy(recv_sys->flush_end);
 		}
 #endif /* !UNIV_HOTBACKUP */
-		ut_free(recv_sys->buf);
 		ut_free(recv_sys->last_block_buf_start);
 
 		mutex_free(&recv_sys->mutex);
@@ -837,6 +860,12 @@ recv_sys_close(void)
 	}
 
 	recv_spaces.clear();
+
+	if (recv_spaces_lock != NULL) {
+		rw_lock_free(recv_spaces_lock);
+		ut_free(recv_spaces_lock);
+		recv_spaces_lock = NULL;
+	}
 }
 
 /********************************************************//**
@@ -862,7 +891,6 @@ recv_sys_mem_free(void)
 			os_event_destroy(recv_sys->flush_end);
 		}
 #endif /* !UNIV_HOTBACKUP */
-		ut_free(recv_sys->buf);
 		ut_free(recv_sys->last_block_buf_start);
 		ut_free(recv_sys);
 		recv_sys = NULL;
@@ -922,11 +950,6 @@ recv_sys_init(
 		recv_n_pool_free_frames = 512;
 	}
 
-	recv_sys->buf = static_cast<byte*>(
-		ut_malloc_nokey(RECV_PARSING_BUF_SIZE));
-	recv_sys->len = 0;
-	recv_sys->recovered_offset = 0;
-
 	recv_sys->addr_hash = hash_create(available_memory / 512);
 	recv_sys->n_addrs = 0;
 
@@ -984,10 +1007,8 @@ recv_sys_debug_free(void)
 
 	hash_table_free(recv_sys->addr_hash);
 	mem_heap_free(recv_sys->heap);
-	ut_free(recv_sys->buf);
 	ut_free(recv_sys->last_block_buf_start);
 
-	recv_sys->buf = NULL;
 	recv_sys->heap = NULL;
 	recv_sys->addr_hash = NULL;
 	recv_sys->last_block_buf_start = NULL;
@@ -1211,8 +1232,7 @@ recv_log_format_0_recover(lsn_t lsn)
 
 	/* Mark the redo log for upgrading. */
 	srv_log_file_size = 0;
-	recv_sys->parse_start_lsn = recv_sys->recovered_lsn
-		= recv_sys->scanned_lsn
+	recv_sys->recovered_lsn
 		= recv_sys->mlog_checkpoint_lsn = lsn;
 	log_sys->last_checkpoint_lsn = log_sys->next_checkpoint_lsn
 		= log_sys->lsn = log_sys->write_lsn
@@ -1512,6 +1532,9 @@ fil_write_encryption_parse(
 	byte*		iv = NULL;
 	bool		is_new = false;
 
+	// TODO laurynas assert single-threaded operation
+	ut_ad(recv_sys->mlog_checkpoint_lsn == 0);
+
 	space = fil_space_get(space_id);
 	if (space == NULL) {
 		encryption_list_t::iterator	it;
@@ -1598,6 +1621,42 @@ fil_write_encryption_parse(
 
 	return(ptr);
 }
+
+struct parallel_recv_t {
+	/** LSN from which we were able to start parsing log records and adding
+	them to the hash table; zero if a suitable start point not found yet */
+	lsn_t		parse_start_lsn;
+	/** The log data has been scanned up to this LSN */
+	lsn_t		scanned_lsn;
+	/** The log data has been scanned up to this checkpoint number (lowest
+	4 bytes) */
+	ulint		scanned_checkpoint_no;
+	/** The log records have been parsed up to
+	this lsn */
+	lsn_t		recovered_lsn;
+	/** Buffer for parsing log records */
+	byte*		buf;
+	/** Amount of data in buf */
+	ulint		len;
+	/** Start offset of non-parsed log records in buf */
+	ulint		recovered_offset;
+
+	explicit parallel_recv_t(lsn_t parse_start_lsn_arg)
+		: parse_start_lsn(parse_start_lsn_arg),
+		  scanned_lsn(parse_start_lsn_arg),
+		  scanned_checkpoint_no(0),
+		  recovered_lsn(parse_start_lsn_arg), // TODO laurynas == contiguous_lsn
+		  buf(static_cast<byte *>(ut_malloc_nokey(RECV_PARSING_BUF_SIZE))),
+		  len(0),
+		  recovered_offset(0)
+	{
+	}
+
+	~parallel_recv_t(void)
+	{
+		ut_free(buf);
+	}
+};
 
 /** Try to parse a single log record body and also applies it if
 specified.
@@ -1738,13 +1797,29 @@ recv_parse_or_apply_log_rec_body(
 		page_zip = buf_block_get_page_zip(block);
 		ut_d(page_type = fil_page_get_type(page));
 	} else if (apply
-		   && !is_predefined_tablespace(space_id)
-		   && recv_spaces.find(space_id) == recv_spaces.end()) {
-		ib::fatal() << "Missing MLOG_FILE_NAME or MLOG_FILE_DELETE"
-			" for redo log record " << type << " (page "
-			<< space_id << ":" << page_no << ") at "
-			<< recv_sys->recovered_lsn << ".";
-		return(NULL);
+		   && !is_predefined_tablespace(space_id)) {
+
+		rw_lock_s_lock(recv_spaces_lock);
+		const bool space_id_missing
+			= recv_spaces.find(space_id) == recv_spaces.end();
+		rw_lock_s_unlock(recv_spaces_lock);
+
+		if (space_id_missing)
+		{
+
+			ut_ad(recv_sys->mlog_checkpoint_lsn != 0);
+			ib::fatal()
+				<< "Missing MLOG_FILE_NAME or MLOG_FILE_DELETE"
+				" for redo log record " << type << " (page "
+				<< space_id << ":" << page_no << ") at "
+				<< recv_sys->recovered_lsn << ".";
+			return(NULL);
+		} else {
+			/* Parsing a page log record. */
+			page = NULL;
+			page_zip = NULL;
+			ut_d(page_type = FIL_PAGE_TYPE_ALLOCATED);
+		}
 	} else {
 		/* Parsing a page log record. */
 		page = NULL;
@@ -2951,7 +3026,7 @@ recv_parse_log_rec(
 		if (new_ptr != NULL) {
 			const lsn_t	lsn = static_cast<lsn_t>(
 				*space) << 32 | *page_no;
-			ut_a(lsn == recv_sys->recovered_lsn);
+			ut_a(lsn == recv_sys->recovered_lsn); // TODO laurynas later
 		}
 
 		*type = MLOG_LSN;
@@ -3028,6 +3103,7 @@ recv_calc_lsn_on_data_add(
 static
 bool
 recv_report_corrupt_log(
+	const parallel_recv_t& parallel_recv,
 	const byte*	ptr,
 	int		type,
 	ulint		space,
@@ -3036,29 +3112,31 @@ recv_report_corrupt_log(
 	ib::error() <<
 		"############### CORRUPT LOG RECORD FOUND ##################";
 
+	// TODO laurynas parallel_recv
 	ib::info() << "Log record type " << type << ", page " << space << ":"
 		<< page_no << ". Log parsing proceeded successfully up to "
-		<< recv_sys->recovered_lsn << ". Previous log record type "
+		<< parallel_recv.recovered_lsn << ". Previous log record type "
 		<< recv_previous_parsed_rec_type << ", is multi "
 		<< recv_previous_parsed_rec_is_multi << " Recv offset "
-		<< (ptr - recv_sys->buf) << ", prev "
+		<< (ptr - parallel_recv.buf) << ", prev "
 		<< recv_previous_parsed_rec_offset;
 
-	ut_ad(ptr <= recv_sys->buf + recv_sys->len);
+	ut_ad(ptr <= parallel_recv.buf + parallel_recv.len);
 
 	const ulint	limit	= 100;
 	const ulint	before
 		= std::min(recv_previous_parsed_rec_offset, limit);
 	const ulint	after
-		= std::min(recv_sys->len - (ptr - recv_sys->buf), limit);
+		= std::min(parallel_recv.len - (ptr - parallel_recv.buf),
+			   limit);
 
 	ib::info() << "Hex dump starting " << before << " bytes before and"
 		" ending " << after << " bytes after the corrupted record:";
 
 	ut_print_buf(stderr,
-		     recv_sys->buf
+		     parallel_recv.buf
 		     + recv_previous_parsed_rec_offset - before,
-		     ptr - recv_sys->buf + before + after
+		     ptr - parallel_recv.buf + before + after
 		     - recv_previous_parsed_rec_offset);
 	putc('\n', stderr);
 
@@ -3097,6 +3175,7 @@ or corruption was noticed */
 static MY_ATTRIBUTE((warn_unused_result))
 bool
 recv_parse_log_recs(
+	parallel_recv_t& parallel_recv,
 	lsn_t		checkpoint_lsn,
 	store_t		store,
 	bool		apply)
@@ -3112,12 +3191,12 @@ recv_parse_log_recs(
 	ulint		page_no;
 	byte*		body;
 
-	ut_ad(log_mutex_own());
-	ut_ad(recv_sys->parse_start_lsn != 0);
+	ut_ad(!log_mutex_own());
+	ut_ad(parallel_recv.parse_start_lsn != 0);
 loop:
-	ptr = recv_sys->buf + recv_sys->recovered_offset;
+	ptr = parallel_recv.buf + parallel_recv.recovered_offset;
 
-	end_ptr = recv_sys->buf + recv_sys->len;
+	end_ptr = parallel_recv.buf + parallel_recv.len;
 
 	if (ptr == end_ptr) {
 
@@ -3139,7 +3218,7 @@ loop:
 	if (single_rec) {
 		/* The mtr did not modify multiple pages */
 
-		old_lsn = recv_sys->recovered_lsn;
+		old_lsn = parallel_recv.recovered_lsn;
 
 		/* Try to parse a log record, fetching its type, space id,
 		page no, and a pointer to the body of the log record */
@@ -3152,7 +3231,7 @@ loop:
 		}
 
 		if (recv_sys->found_corrupt_log) {
-			recv_report_corrupt_log(
+			recv_report_corrupt_log(parallel_recv,
 				ptr, type, space, page_no);
 			return(true);
 		}
@@ -3163,7 +3242,7 @@ loop:
 
 		new_recovered_lsn = recv_calc_lsn_on_data_add(old_lsn, len);
 
-		if (new_recovered_lsn > recv_sys->scanned_lsn) {
+		if (new_recovered_lsn > parallel_recv.scanned_lsn) {
 			/* The log record filled a log block, and we require
 			that also the next log block should have been scanned
 			in */
@@ -3172,11 +3251,12 @@ loop:
 		}
 
 		recv_previous_parsed_rec_type = type;
-		recv_previous_parsed_rec_offset = recv_sys->recovered_offset;
+		recv_previous_parsed_rec_offset
+			= parallel_recv.recovered_offset;
 		recv_previous_parsed_rec_is_multi = 0;
 
-		recv_sys->recovered_offset += len;
-		recv_sys->recovered_lsn = new_recovered_lsn;
+		parallel_recv.recovered_offset += len;
+		parallel_recv.recovered_lsn = new_recovered_lsn;
 
 		switch (type) {
 			lsn_t	lsn;
@@ -3196,7 +3276,7 @@ loop:
 				    lsn != checkpoint_lsn ? "ignored"
 				    : recv_sys->mlog_checkpoint_lsn
 				    ? "reread" : "read",
-				    recv_sys->recovered_lsn));
+				    parallel_recv.recovered_lsn));
 
 			if (lsn == checkpoint_lsn) {
 				if (recv_sys->mlog_checkpoint_lsn) {
@@ -3206,11 +3286,11 @@ loop:
 					recv_sys->mlog_checkpoint_lsn
 					can differ from the current LSN. */
 					ut_ad(recv_sys->mlog_checkpoint_lsn
-					      <= recv_sys->recovered_lsn);
+					      <= parallel_recv.recovered_lsn);
 					break;
 				}
 				recv_sys->mlog_checkpoint_lsn
-					= recv_sys->recovered_lsn;
+					= parallel_recv.recovered_lsn;
 #ifndef UNIV_HOTBACKUP
 				return(true);
 #endif /* !UNIV_HOTBACKUP */
@@ -3246,7 +3326,7 @@ loop:
 				recv_add_to_hash_table(
 					type, space, page_no, body,
 					ptr + len, old_lsn,
-					recv_sys->recovered_lsn);
+					parallel_recv.recovered_lsn);
 			}
 			/* fall through */
 		case MLOG_INDEX_LOAD:
@@ -3277,7 +3357,7 @@ loop:
 			    || type == MLOG_CHECKPOINT
 			    || (*ptr & MLOG_SINGLE_REC_FLAG)) {
 				recv_sys->found_corrupt_log = true;
-				recv_report_corrupt_log(
+				recv_report_corrupt_log(parallel_recv,
 					ptr, type, space, page_no);
 				return(true);
 			}
@@ -3288,7 +3368,7 @@ loop:
 
 			recv_previous_parsed_rec_type = type;
 			recv_previous_parsed_rec_offset
-				= recv_sys->recovered_offset + total_len;
+				= parallel_recv.recovered_offset + total_len;
 			recv_previous_parsed_rec_is_multi = 1;
 
 			total_len += len;
@@ -3302,7 +3382,7 @@ loop:
 					    ": multi-log end"
 					    " total_len " ULINTPF
 					    " n=" ULINTPF,
-					    recv_sys->recovered_lsn,
+					    parallel_recv.recovered_lsn,
 					    total_len, n_recs));
 				break;
 			}
@@ -3311,14 +3391,14 @@ loop:
 				   ("scan " LSN_PF ": multi-log rec %s"
 				    " len " ULINTPF
 				    " page " ULINTPF ":" ULINTPF,
-				    recv_sys->recovered_lsn,
+				    parallel_recv.recovered_lsn,
 				    get_mlog_string(type), len, space, page_no));
 		}
 
 		new_recovered_lsn = recv_calc_lsn_on_data_add(
-			recv_sys->recovered_lsn, total_len);
+			parallel_recv.recovered_lsn, total_len);
 
-		if (new_recovered_lsn > recv_sys->scanned_lsn) {
+		if (new_recovered_lsn > parallel_recv.scanned_lsn) {
 			/* The log record filled a log block, and we require
 			that also the next log block should have been scanned
 			in */
@@ -3328,10 +3408,10 @@ loop:
 
 		/* Add all the records to the hash table */
 
-		ptr = recv_sys->buf + recv_sys->recovered_offset;
+		ptr = parallel_recv.buf + parallel_recv.recovered_offset;
 
 		for (;;) {
-			old_lsn = recv_sys->recovered_lsn;
+			old_lsn = parallel_recv.recovered_lsn;
 			/* This will apply MLOG_FILE_ records. We
 			had to skip them in the first scan, because we
 			did not know if the mini-transaction was
@@ -3341,7 +3421,7 @@ loop:
 				apply, &body);
 
 			if (recv_sys->found_corrupt_log
-			    && !recv_report_corrupt_log(
+			    && !recv_report_corrupt_log(parallel_recv,
 				    ptr, type, space, page_no)) {
 				return(true);
 			}
@@ -3353,8 +3433,8 @@ loop:
 			ut_a(len != 0);
 			ut_a(!(*ptr & MLOG_SINGLE_REC_FLAG));
 
-			recv_sys->recovered_offset += len;
-			recv_sys->recovered_lsn
+			parallel_recv.recovered_offset += len;
+			parallel_recv.recovered_lsn
 				= recv_calc_lsn_on_data_add(old_lsn, len);
 
 			switch (type) {
@@ -3406,12 +3486,13 @@ loop:
 
 /*******************************************************//**
 Adds data from a new log block to the parsing buffer of recv_sys if
-recv_sys->parse_start_lsn is non-zero.
+parallel_recv->parse_start_lsn is non-zero.
 @return true if more data added */
 static
 bool
 recv_sys_add_to_parsing_buf(
 /*========================*/
+	parallel_recv_t&	parallel_recv,
 	const byte*	log_block,	/*!< in: log block */
 	lsn_t		scanned_lsn)	/*!< in: lsn of how far we were able
 					to find data in this log block */
@@ -3421,9 +3502,9 @@ recv_sys_add_to_parsing_buf(
 	ulint	start_offset;
 	ulint	end_offset;
 
-	ut_ad(scanned_lsn >= recv_sys->scanned_lsn);
+	ut_ad(scanned_lsn >= parallel_recv.scanned_lsn);
 
-	if (!recv_sys->parse_start_lsn) {
+	if (!parallel_recv.parse_start_lsn) {
 		/* Cannot start parsing yet because no start point for
 		it found */
 
@@ -3432,18 +3513,20 @@ recv_sys_add_to_parsing_buf(
 
 	data_len = log_block_get_data_len(log_block);
 
-	if (recv_sys->parse_start_lsn >= scanned_lsn) {
+	if (parallel_recv.parse_start_lsn >= scanned_lsn) {
 
 		return(false);
 
-	} else if (recv_sys->scanned_lsn >= scanned_lsn) {
+	} else if (parallel_recv.scanned_lsn >= scanned_lsn) {
 
 		return(false);
 
-	} else if (recv_sys->parse_start_lsn > recv_sys->scanned_lsn) {
-		more_len = (ulint) (scanned_lsn - recv_sys->parse_start_lsn);
+	} else if (parallel_recv.parse_start_lsn
+		   > parallel_recv.scanned_lsn) {
+		more_len = (ulint) (scanned_lsn
+				    - parallel_recv.parse_start_lsn);
 	} else {
-		more_len = (ulint) (scanned_lsn - recv_sys->scanned_lsn);
+		more_len = (ulint) (scanned_lsn - parallel_recv.scanned_lsn);
 	}
 
 	if (more_len == 0) {
@@ -3468,12 +3551,12 @@ recv_sys_add_to_parsing_buf(
 	ut_ad(start_offset <= end_offset);
 
 	if (start_offset < end_offset) {
-		ut_memcpy(recv_sys->buf + recv_sys->len,
+		ut_memcpy(parallel_recv.buf + parallel_recv.len,
 			  log_block + start_offset, end_offset - start_offset);
 
-		recv_sys->len += end_offset - start_offset;
+		parallel_recv.len += end_offset - start_offset;
 
-		ut_a(recv_sys->len <= RECV_PARSING_BUF_SIZE);
+		ut_a(parallel_recv.len <= RECV_PARSING_BUF_SIZE);
 	}
 
 	return(true);
@@ -3483,15 +3566,16 @@ recv_sys_add_to_parsing_buf(
 Moves the parsing buffer data left to the buffer start. */
 static
 void
-recv_sys_justify_left_parsing_buf(void)
+recv_sys_justify_left_parsing_buf(parallel_recv_t& parallel_recv)
 /*===================================*/
 {
-	ut_memmove(recv_sys->buf, recv_sys->buf + recv_sys->recovered_offset,
-		   recv_sys->len - recv_sys->recovered_offset);
+	ut_memmove(parallel_recv.buf,
+		   parallel_recv.buf + parallel_recv.recovered_offset,
+		   parallel_recv.len - parallel_recv.recovered_offset);
 
-	recv_sys->len -= recv_sys->recovered_offset;
+	parallel_recv.len -= parallel_recv.recovered_offset;
 
-	recv_sys->recovered_offset = 0;
+	parallel_recv.recovered_offset = 0;
 }
 
 /*******************************************************//**
@@ -3504,6 +3588,7 @@ static
 bool
 recv_scan_log_recs(
 /*===============*/
+	parallel_recv_t&	parallel_recv,
 	ulint		available_memory,/*!< in: we let the hash table of recs
 					to grow to this size, at the maximum */
 	store_t*	store_to_hash,	/*!< in,out: whether the records should be
@@ -3579,10 +3664,10 @@ recv_scan_log_recs(
 
 		data_len = log_block_get_data_len(log_block);
 
-		if (scanned_lsn + data_len > recv_sys->scanned_lsn
+		if (scanned_lsn + data_len > parallel_recv.scanned_lsn
 		    && log_block_get_checkpoint_no(log_block)
-		    < recv_sys->scanned_checkpoint_no
-		    && (recv_sys->scanned_checkpoint_no
+		    < parallel_recv.scanned_checkpoint_no
+		    && (parallel_recv.scanned_checkpoint_no
 			- log_block_get_checkpoint_no(log_block)
 			> 0x80000000UL)) {
 
@@ -3592,21 +3677,23 @@ recv_scan_log_recs(
 			break;
 		}
 
-		if (!recv_sys->parse_start_lsn
+		if (!parallel_recv.parse_start_lsn
 		    && (log_block_get_first_rec_group(log_block) > 0)) {
 
 			/* We found a point from which to start the parsing
 			of log records */
 
-			recv_sys->parse_start_lsn = scanned_lsn
+			parallel_recv.parse_start_lsn = scanned_lsn
 				+ log_block_get_first_rec_group(log_block);
-			recv_sys->scanned_lsn = recv_sys->parse_start_lsn;
-			recv_sys->recovered_lsn = recv_sys->parse_start_lsn;
+			parallel_recv.scanned_lsn
+				= parallel_recv.parse_start_lsn;
+			parallel_recv.recovered_lsn
+				= parallel_recv.parse_start_lsn;
 		}
 
 		scanned_lsn += data_len;
 
-		if (scanned_lsn > recv_sys->scanned_lsn) {
+		if (scanned_lsn > parallel_recv.scanned_lsn) {
 
 			/* We have found more entries. If this scan is
 			of startup type, we must initiate crash recovery
@@ -3618,7 +3705,7 @@ recv_scan_log_recs(
 				if (!srv_read_only_mode) {
 					ib::info() << "Log scan progressed"
 						" past the checkpoint lsn "
-						<< recv_sys->scanned_lsn;
+						<< parallel_recv.scanned_lsn;
 
 					recv_init_crash_recovery();
 				} else {
@@ -3635,7 +3722,7 @@ recv_scan_log_recs(
 			parsing buffer if parse_start_lsn is already
 			non-zero */
 
-			if (recv_sys->len + 4 * OS_FILE_LOG_BLOCK_SIZE
+			if (parallel_recv.len + 4 * OS_FILE_LOG_BLOCK_SIZE
 			    >= RECV_PARSING_BUF_SIZE) {
 				ib::error() << "Log parsing buffer overflow."
 					" Recovery may have failed!";
@@ -3653,11 +3740,11 @@ recv_scan_log_recs(
 
 			} else if (!recv_sys->found_corrupt_log) {
 				more_data = recv_sys_add_to_parsing_buf(
-					log_block, scanned_lsn);
+					parallel_recv, log_block, scanned_lsn);
 			}
 
-			recv_sys->scanned_lsn = scanned_lsn;
-			recv_sys->scanned_checkpoint_no
+			parallel_recv.scanned_lsn = scanned_lsn;
+			parallel_recv.scanned_checkpoint_no
 				= log_block_get_checkpoint_no(log_block);
 		}
 
@@ -3686,12 +3773,12 @@ recv_scan_log_recs(
 	if (more_data && !recv_sys->found_corrupt_log) {
 		/* Try to parse more log records */
 
-		if (recv_parse_log_recs(checkpoint_lsn,
+		if (recv_parse_log_recs(parallel_recv, checkpoint_lsn,
 					*store_to_hash, apply)) {
 			ut_ad(recv_sys->found_corrupt_log
 			      || recv_sys->found_corrupt_fs
 			      || recv_sys->mlog_checkpoint_lsn
-			      == recv_sys->recovered_lsn);
+			      == parallel_recv.recovered_lsn);
 			return(true);
 		}
 
@@ -3700,10 +3787,11 @@ recv_scan_log_recs(
 			*store_to_hash = STORE_NO;
 		}
 
-		if (recv_sys->recovered_offset > RECV_PARSING_BUF_SIZE / 4) {
+		if (parallel_recv.recovered_offset
+		    > RECV_PARSING_BUF_SIZE / 4) {
 			/* Move parsing buffer data to the buffer start */
 
-			recv_sys_justify_left_parsing_buf();
+			recv_sys_justify_left_parsing_buf(parallel_recv);
 		}
 	}
 
@@ -3711,6 +3799,12 @@ recv_scan_log_recs(
 }
 
 #ifndef UNIV_HOTBACKUP
+
+// Read-only context for all the parallel scanner threads
+static log_group_t*	parallel_recv_log_group;
+static lsn_t		parallel_recv_checkpoint_lsn;
+static ulint		parallel_recv_available_mem;
+
 /** Scans log from a buffer and stores new log data to the parsing buffer.
 Parses and hashes the log records if new data found.
 @param[in,out]	group			log group
@@ -3723,39 +3817,25 @@ static
 bool
 recv_group_scan_log_recs(
 	log_group_t*	group,
+	const lsn_range_t& lsn_range,
 	lsn_t*		contiguous_lsn,
 	bool		last_phase)
 {
 	DBUG_ENTER("recv_group_scan_log_recs");
 	DBUG_ASSERT(!last_phase || recv_sys->mlog_checkpoint_lsn > 0);
+	ut_ad(!log_mutex_own());
+	ut_ad(!mutex_own(&recv_sys->mutex));
 
-	mutex_enter(&recv_sys->mutex);
-	recv_sys->len = 0;
-	recv_sys->recovered_offset = 0;
-	recv_sys->n_addrs = 0;
-	recv_sys_empty_hash();
-	srv_start_lsn = *contiguous_lsn;
-	recv_sys->parse_start_lsn = *contiguous_lsn;
-	recv_sys->scanned_lsn = *contiguous_lsn;
-	recv_sys->recovered_lsn = *contiguous_lsn;
-	recv_sys->scanned_checkpoint_no = 0;
-	recv_previous_parsed_rec_type = MLOG_SINGLE_REC_FLAG;
-	recv_previous_parsed_rec_offset	= 0;
-	recv_previous_parsed_rec_is_multi = 0;
-	ut_ad(recv_max_page_lsn == 0);
-	mutex_exit(&recv_sys->mutex);
-
-	lsn_t	checkpoint_lsn	= *contiguous_lsn;
 	lsn_t	start_lsn;
 	lsn_t	end_lsn;
 	store_t	store_to_hash	= recv_sys->mlog_checkpoint_lsn == 0
 		? STORE_NO : (last_phase ? STORE_IF_EXISTS : STORE_YES);
-	ulint	available_mem	= UNIV_PAGE_SIZE
-		* (buf_pool_get_n_pages()
-		   - (recv_n_pool_free_frames * srv_buf_pool_instances));
+	std::vector<byte> buf(RECV_SCAN_SIZE);
+	parallel_recv_t parallel_recv(*contiguous_lsn);
+	lsn_t	group_scanned_lsn;
 
 	end_lsn = *contiguous_lsn = ut_uint64_align_down(
-		*contiguous_lsn, OS_FILE_LOG_BLOCK_SIZE);
+		lsn_range.first, OS_FILE_LOG_BLOCK_SIZE);
 
 	do {
 		if (last_phase && store_to_hash == STORE_NO) {
@@ -3769,14 +3849,17 @@ recv_group_scan_log_recs(
 
 		start_lsn = end_lsn;
 		end_lsn += RECV_SCAN_SIZE;
+		if (end_lsn > lsn_range.second)
+			end_lsn = lsn_range.second;
 
-		log_group_read_log_seg(
-			log_sys->buf, group, start_lsn, end_lsn, false);
-	} while (!recv_scan_log_recs(
-			 available_mem, &store_to_hash, log_sys->buf,
-			 RECV_SCAN_SIZE,
-			 checkpoint_lsn,
-			 start_lsn, contiguous_lsn, &group->scanned_lsn));
+		log_mutex_enter();
+		log_group_read_log_seg(&buf[0], group, start_lsn, end_lsn,
+				       true);
+	} while (!recv_scan_log_recs(parallel_recv,
+			 parallel_recv_available_mem, &store_to_hash,
+			 &buf[0], RECV_SCAN_SIZE,
+			 parallel_recv_checkpoint_lsn,
+			 start_lsn, contiguous_lsn, &group_scanned_lsn));
 
 	if (recv_sys->found_corrupt_log || recv_sys->found_corrupt_fs) {
 		DBUG_RETURN(false);
@@ -3786,6 +3869,13 @@ recv_group_scan_log_recs(
 			      " completed for log group " ULINTPF,
 			      last_phase ? "rescan" : "scan",
 			      group->scanned_lsn, group->id));
+
+	mutex_enter(&recv_sys->mutex);
+	if (group_scanned_lsn > group->scanned_lsn)
+		group->scanned_lsn = group_scanned_lsn;
+	if (parallel_recv.recovered_lsn > recv_sys->recovered_lsn)
+		recv_sys->recovered_lsn = parallel_recv.recovered_lsn;
+	mutex_exit(&recv_sys->mutex);
 
 	DBUG_RETURN(store_to_hash == STORE_NO);
 }
@@ -3797,6 +3887,7 @@ static
 void
 recv_init_crash_recovery(void)
 {
+	// TODO laurynas assert single-threaded operation
 	ut_ad(!srv_read_only_mode);
 	ut_a(!recv_needed_recovery);
 
@@ -3811,6 +3902,7 @@ static
 dberr_t
 recv_init_missing_space(dberr_t err, const recv_spaces_t::const_iterator& i)
 {
+	// TODO laurynas assert single-threaded operation
 	if (srv_force_recovery == 0) {
 		ib::error() << "Tablespace " << i->first << " was not"
 			" found at " << i->second.name << ".";
@@ -3837,6 +3929,7 @@ static MY_ATTRIBUTE((warn_unused_result))
 dberr_t
 recv_init_crash_recovery_spaces(void)
 {
+	// TODO laurynas assert single-threaded operation
 	typedef std::set<ulint>	space_set_t;
 	bool		flag_deleted	= false;
 	space_set_t	missing_spaces;
@@ -3927,6 +4020,59 @@ recv_init_crash_recovery_spaces(void)
 	buf_dblwr_process();
 
 	return(DB_SUCCESS);
+}
+
+static
+void
+recv_init_group_scan_log_recs(lsn_t contiguous_lsn, log_group_t *group)
+{
+	parallel_recv_log_group = group;
+	parallel_recv_checkpoint_lsn = contiguous_lsn;
+	parallel_recv_available_mem = UNIV_PAGE_SIZE
+		* (buf_pool_get_n_pages()
+		   - (recv_n_pool_free_frames * srv_buf_pool_instances));
+
+	mutex_enter(&recv_sys->mutex);
+	recv_sys->n_addrs = 0;
+	recv_sys_empty_hash();
+	srv_start_lsn = contiguous_lsn;
+	recv_previous_parsed_rec_type = MLOG_SINGLE_REC_FLAG;
+	recv_previous_parsed_rec_offset	= 0;
+	recv_previous_parsed_rec_is_multi = 0;
+	ut_ad(recv_max_page_lsn == 0);
+	mutex_exit(&recv_sys->mutex);
+}
+
+extern "C"
+os_thread_ret_t
+DECLARE_THREAD(recovery_log_scanner)(
+	void*	arg)
+{
+	my_thread_init();
+
+#if 0
+#ifdef UNIV_PFS_THREAD
+	pfs_register_thread(TODO_key);
+#endif /* UNIV_PFS_THREAD */
+#endif
+
+	const lsn_range_t* range = static_cast<lsn_range_t *>(arg);
+
+	// TODO UNIV_DEBUG_THREAD_CREATION?
+	ib::info() << "Recovery log scanner thread running for LSN range "
+		   << range->first << " to " << range->second;
+
+	lsn_t dummy_lsn = range->first;
+	bool rescan = recv_group_scan_log_recs(parallel_recv_log_group, *range,
+					       &dummy_lsn, false);
+	// TODO laurynas
+	ut_ad(!rescan);
+
+	my_thread_end();
+
+	os_thread_exit();
+
+	OS_THREAD_DUMMY_RETURN;
 }
 
 /** Start recovering from a redo log checkpoint.
@@ -4065,14 +4211,22 @@ recv_recovery_from_checkpoint_start(
 		return(DB_ERROR);
 	}
 
+	log_mutex_exit();
+
 	/* Look for MLOG_CHECKPOINT. */
-	recv_group_scan_log_recs(group, &contiguous_lsn, false);
+	recv_init_group_scan_log_recs(contiguous_lsn, group);
+
+	// TODO laurynas contiguous_lsn
+	lsn_t	dummy_lsn = contiguous_lsn;
+	recv_group_scan_log_recs(group,
+				 std::make_pair(contiguous_lsn, LSN_MAX),
+				 &dummy_lsn, false);
+
 	/* The first scan should not have stored or applied any records. */
 	ut_ad(recv_sys->n_addrs == 0);
 	ut_ad(!recv_sys->found_corrupt_fs);
 
 	if (recv_sys->found_corrupt_log && !srv_force_recovery) {
-		log_mutex_exit();
 		return(DB_ERROR);
 	}
 
@@ -4084,7 +4238,6 @@ recv_recovery_from_checkpoint_start(
 				<< checkpoint_lsn << " and the end "
 				<< group->scanned_lsn << ".";
 			if (srv_force_recovery < SRV_FORCE_NO_LOG_REDO) {
-				log_mutex_exit();
 				return(DB_ERROR);
 			}
 		}
@@ -4092,17 +4245,54 @@ recv_recovery_from_checkpoint_start(
 		group->scanned_lsn = checkpoint_lsn;
 		rescan = false;
 	} else {
-		contiguous_lsn = checkpoint_lsn;
+
+		const std::vector<lsn_range_t> log_markers
+		    = log_markers_get(checkpoint_lsn, LSN_MAX, err);
+		if (err != DB_SUCCESS) {
+		    ut_ad(log_markers.empty());
+		    return(err);
+		}
+		ut_ad(!log_markers.empty());
+
+		std::vector<os_thread_id_t> thread_ids(log_markers.size() - 1);
+
+		for (ulint i = 0; i < log_markers.size() - 1; i++) {
+
+		    os_thread_id_t	thread_id;
+		    os_thread_create(recovery_log_scanner,
+				     const_cast<lsn_range_t *>(&log_markers[i]),
+				     &thread_id);
+
+		    thread_ids[i] = thread_id;
+		}
+
+		const lsn_range_t& range = log_markers[log_markers.size() - 1];
+
+		ib::info() << "Main recovery thread scanning LSN range "
+			   << range.first << " to " << range.second;
+
+		recv_init_group_scan_log_recs(contiguous_lsn, group);
+
+		// TODO laurynas contiguous_lsn
+		lsn_t	dummy_lsn = range.first;
+
 		rescan = recv_group_scan_log_recs(
-			group, &contiguous_lsn, false);
+			parallel_recv_log_group, range, &dummy_lsn, false);
+
+		for (std::vector<os_thread_id_t>::const_iterator thread_id
+			 = thread_ids.cbegin();
+		     thread_id != thread_ids.cend(); thread_id++) {
+
+		    pthread_join(*thread_id, NULL);
+		}
 
 		if ((recv_sys->found_corrupt_log && !srv_force_recovery)
 		    || recv_sys->found_corrupt_fs) {
-			log_mutex_exit();
 			return(DB_ERROR);
 		}
 	}
 
+	log_mutex_enter(); // TODO laurynas?
 	/* NOTE: we always do a 'recovery' at startup, but only if
 	there is something wrong we will print a message to the
 	user about recovery: */
@@ -4148,7 +4338,13 @@ recv_recovery_from_checkpoint_start(
 
 		if (rescan) {
 			contiguous_lsn = checkpoint_lsn;
-			recv_group_scan_log_recs(group, &contiguous_lsn, true);
+			// TODO laurynas make_pair
+			ut_ad(0);
+			recv_init_group_scan_log_recs(contiguous_lsn, group);
+			recv_group_scan_log_recs(group,
+						 std::make_pair(0, LSN_MAX),
+						 &contiguous_lsn,
+						 true);
 
 			if ((recv_sys->found_corrupt_log
 			     && !srv_force_recovery)

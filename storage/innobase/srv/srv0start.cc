@@ -61,6 +61,7 @@ Created 2/16/1996 Heikki Tuuri
 #include "rem0rec.h"
 #include "mtr0mtr.h"
 #include "log0log.h"
+#include "log0markers.h"
 #include "log0online.h"
 #include "log0recv.h"
 #include "page0page.h"
@@ -2156,6 +2157,10 @@ files_checked:
 		ut_a(!srv_read_only_mode);
 		init_log_online();
 
+		err = log_markers_create();
+		if (err != DB_SUCCESS)
+			return(srv_init_abort(err));
+
 		mtr_start(&mtr);
 
 		bool ret = fsp_header_init(0, sum_of_new_sizes, &mtr);
@@ -2279,6 +2284,10 @@ files_checked:
 			return(srv_init_abort(err));
 
 		init_log_online();
+
+		err = log_markers_create();
+		if (err != DB_SUCCESS)
+			return(srv_init_abort(err));
 
 		purge_queue = trx_sys_init_at_db_start();
 

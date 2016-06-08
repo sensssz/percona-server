@@ -365,30 +365,14 @@ struct recv_sys_t{
 	byte*		last_block_buf_start;
 				/*!< the nonaligned start address of the
 				preceding buffer */
-	byte*		buf;	/*!< buffer for parsing log records */
-	ulint		len;	/*!< amount of data in buf */
-	lsn_t		parse_start_lsn;
-				/*!< this is the lsn from which we were able to
-				start parsing log records and adding them to
-				the hash table; zero if a suitable
-				start point not found yet */
-	lsn_t		scanned_lsn;
-				/*!< the log data has been scanned up to this
-				lsn */
-	ulint		scanned_checkpoint_no;
-				/*!< the log data has been scanned up to this
-				checkpoint number (lowest 4 bytes) */
-	ulint		recovered_offset;
-				/*!< start offset of non-parsed log records in
-				buf */
 	lsn_t		recovered_lsn;
 				/*!< the log records have been parsed up to
 				this lsn */
-	bool		found_corrupt_log;
+	bool		found_corrupt_log; // TODO laurynas later
 				/*!< set when finding a corrupt log
 				block or record, or there is a log
 				parsing buffer overflow */
-	bool		found_corrupt_fs;
+	bool		found_corrupt_fs; // TODO laurynas later
 				/*!< set when an inconsistency with
 				the file system contents is detected
 				during log scan or apply */
