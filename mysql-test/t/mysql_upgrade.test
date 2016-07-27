@@ -44,6 +44,8 @@ DROP USER mysqltest1@'%';
 # Bug #26639 mysql_upgrade exits successfully even if external command failed
 #
 
+--error 1
+--exec host not_existing_host
 --echo Run mysql_upgrade with a non existing server socket
 --replace_result $MYSQLTEST_VARDIR var
 --replace_regex /.*mysqlcheck.*: Got/mysqlcheck: Got/ /\([0-9]*\)/(errno)/

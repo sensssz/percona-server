@@ -214,6 +214,8 @@ drop table t17583;
 --exec $MYSQL test -e "connect test localhost" 2>&1
 
 --echo Test connect with dbname + _invalid_ hostname
+--error 1
+--exec host invalid_hostname
 # Mask the errno of the error message
 --replace_regex /\([0-9]*\)/(errno)/
 --error 1
