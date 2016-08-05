@@ -5420,10 +5420,16 @@ create_sp_error:
     if (! (res= mysql_install_plugin(thd, &thd->lex->comment,
                                      &thd->lex->ident)))
       my_ok(thd);
+#ifndef EMBEDDED_LIBRARY
+    mysql_audit_release(thd);
+#endif
     break;
   case SQLCOM_UNINSTALL_PLUGIN:
     if (! (res= mysql_uninstall_plugin(thd, &thd->lex->comment)))
       my_ok(thd);
+#ifndef EMBEDDED_LIBRARY
+    mysql_audit_release(thd);
+#endif
     break;
   case SQLCOM_BINLOG_BASE64_EVENT:
   {
