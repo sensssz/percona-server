@@ -132,6 +132,7 @@ extern uint slave_rows_last_search_algorithm_used;
 extern "C" int check_enough_stack_size(int);
 #endif
 extern my_bool opt_userstat, opt_thread_statistics;
+extern my_bool opt_force_all_plugins;
 extern my_bool opt_enable_named_pipe, opt_sync_frm, opt_allow_suspicious_udfs;
 extern my_bool opt_secure_auth;
 extern char* opt_secure_file_priv;

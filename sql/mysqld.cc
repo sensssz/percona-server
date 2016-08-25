@@ -481,6 +481,7 @@ MYSQL_PLUGIN_IMPORT uint    opt_debug_sync_timeout= 0;
 #endif /* defined(ENABLED_DEBUG_SYNC) */
 my_bool opt_old_style_user_limits= 0, trust_function_creators= 0;
 my_bool opt_userstat= 0, opt_thread_statistics= 0;
+my_bool opt_force_all_plugins= TRUE;
 /*
   True if there is at least one per-hour limit for some user, so we should
   check them before each query (and possibly reset counters when hour is
@@ -5185,6 +5186,18 @@ a file name for --log-bin-index option", opt_binlog_index_name);
                   (opt_help ? PLUGIN_INIT_SKIP_INITIALIZATION : 0)))
   {
     sql_print_error("Failed to initialize plugins.");
+    if (opt_force_all_plugins)
+    {
+      sql_print_error("--force-all-plugins is in effect. Please do one of the "
+                      "following:");
+      sql_print_error("  - fix the plugin initialisation error;");
+      sql_print_error("  - mark the plugin as optional with "
+                      "--<plugin-name>=OPTIONAL and uninstall it or keep it "
+                      "as optional;");
+      sql_print_error("  - temporarily reset --force-all-plugins to FALSE and "
+                      "uninstall the plugin;");
+      sql_print_error("  - reset --force-all-plugins to FALSE permanently.");
+    }
     unireg_abort(1);
   }
   plugins_are_initialized= TRUE;  /* Don't separate from init function */
@@ -7534,6 +7547,9 @@ struct my_option my_long_options[]=
    "(not repair) tables while the MySQL server is running. Disable with "
    "--skip-external-locking.", &opt_external_locking, &opt_external_locking,
    0, GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0},
+  {"force-all-plugins", 0, "Abort server startup if any of plugins fail to "
+   "load ", &opt_force_all_plugins, &opt_force_all_plugins, NULL, GET_BOOL,
+   OPT_ARG, 1, 0, 1, 0, 1, NULL},
   /* We must always support the next option to make scripts like mysqltest
      easier to do */
   {"gdb", 0,

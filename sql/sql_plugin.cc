@@ -1444,7 +1444,8 @@ int plugin_init(int *argc, char **argv, int flags)
   {
     mysql_mutex_unlock(&LOCK_plugin);
     if (plugin_ptr->load_option == PLUGIN_FORCE ||
-        plugin_ptr->load_option == PLUGIN_FORCE_PLUS_PERMANENT)
+        plugin_ptr->load_option == PLUGIN_FORCE_PLUS_PERMANENT ||
+        opt_force_all_plugins)
       reaped_mandatory_plugin= TRUE;
     plugin_deinitialize(plugin_ptr, true);
     mysql_mutex_lock(&LOCK_plugin_delete);

@@ -1,0 +1,34 @@
+--source include/not_embedded.inc
+
+--echo #
+--echo # Test --force-all-plugins command line option
+--echo #
+
+# Adjustment to the OS dependent extension of shared libraries.
+let $expected_extension= so;
+if(`SELECT CONVERT(@@version_compile_os USING latin1)
+           IN ("Win32","Win64","Windows")`)
+{
+   let $expected_extension= dll;
+}
+
+--echo # --force-all-plugins=TRUE fails server startup if an installed plugin fails to load
+--replace_result $expected_extension <expected_extension>
+eval INSTALL PLUGIN audit_log SONAME 'audit_log.$expected_extension';
+
+--source include/shutdown_mysqld.inc
+
+mkdir nonexistent;
+rmdir nonexistent;
+
+--let $error_log=$MYSQLTEST_VARDIR/tmp/my_restart.err
+
+--error 1
+--exec $MYSQLD_CMD --force-all-plugins=TRUE $AUDIT_LOG_OPT --audit_log_file=nonexistent/foo --log-error=$error_log
+
+--let SEARCH_FILE= $error_log
+--let SEARCH_PATTERN= --force-all-plugins is in effect
+--source include/search_pattern_in_file.inc
+
+# --remove_file $error_log
+--source include/start_mysqld.inc
