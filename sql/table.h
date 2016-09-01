@@ -914,6 +914,8 @@ struct TABLE_SHARE
                             uint deadlock_weight);
   /** Release resources and free memory occupied by the table share. */
   void destroy();
+
+  bool has_compressed_columns() const;
 };
 
 
@@ -1301,6 +1303,9 @@ public:
   {
     created= false;
   }
+  bool has_compressed_columns() const;
+  bool has_compressed_columns_with_dictionaries() const;
+  void update_compressed_columns_info(const List<Create_field>& fields);
 };
 
 

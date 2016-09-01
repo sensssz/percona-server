@@ -1541,6 +1541,15 @@ int store_create_info(THD *thd, TABLE_LIST *table_list, String *packet,
     case COLUMN_FORMAT_TYPE_DYNAMIC:
       packet->append(STRING_WITH_LEN(" /*!50606 COLUMN_FORMAT DYNAMIC */"));
       break;
+    case COLUMN_FORMAT_TYPE_COMPRESSED:
+      packet->append(STRING_WITH_LEN(" /*!50632 COLUMN_FORMAT COMPRESSED"));
+      if (field->has_associated_compression_dictionary())
+      {
+        packet->append(STRING_WITH_LEN(" WITH COMPRESSION_DICTIONARY "));
+        packet->append(field->zip_dict_name.str, field->zip_dict_name.length);
+      }
+      packet->append(STRING_WITH_LEN(" */"));
+      break;
     default:
       DBUG_ASSERT(0);
       break;

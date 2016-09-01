@@ -2462,7 +2462,7 @@ row_sel_convert_mysql_key_to_innobase(
 					dfield, buf,
 					FALSE, /* MySQL key value format col */
 					key_ptr + data_offset, data_len,
-					dict_table_is_comp(index->table));
+					dict_table_is_comp(index->table), false, 0, 0 ,0);
 			ut_a(buf <= original_buf + buf_len);
 		}
 
@@ -2555,12 +2555,12 @@ row_sel_store_row_id_to_prebuilt(
 
 #ifdef UNIV_DEBUG
 /** Convert a non-SQL-NULL field from Innobase format to MySQL format. */
-# define row_sel_field_store_in_mysql_format(dest,templ,idx,field,src,len) \
-	row_sel_field_store_in_mysql_format_func(dest,templ,idx,field,src,len)
+# define row_sel_field_store_in_mysql_format(dest,templ,idx,field,src,len, prebuilt) \
+	row_sel_field_store_in_mysql_format_func(dest,templ,idx,field,src,len, prebuilt)
 #else /* UNIV_DEBUG */
 /** Convert a non-SQL-NULL field from Innobase format to MySQL format. */
-# define row_sel_field_store_in_mysql_format(dest,templ,idx,field,src,len) \
-	row_sel_field_store_in_mysql_format_func(dest,templ,src,len)
+# define row_sel_field_store_in_mysql_format(dest,templ,idx,field,src,len, prebuilt) \
+	row_sel_field_store_in_mysql_format_func(dest,templ,src,len, prebuilt)
 #endif /* UNIV_DEBUG */
 
 /**************************************************************//**
@@ -2570,27 +2570,28 @@ static MY_ATTRIBUTE((nonnull))
 void
 row_sel_field_store_in_mysql_format_func(
 /*=====================================*/
-	byte*		dest,	/*!< in/out: buffer where to store; NOTE
-				that BLOBs are not in themselves
-				stored here: the caller must allocate
-				and copy the BLOB into buffer before,
-				and pass the pointer to the BLOB in
-				'data' */
+	byte*		dest,		/*!< in/out: buffer where to store; NOTE
+					that BLOBs are not in themselves
+					stored here: the caller must allocate
+					and copy the BLOB into buffer before,
+					and pass the pointer to the BLOB in
+					'data' */
 	const mysql_row_templ_t* templ,
-				/*!< in: MySQL column template.
-				Its following fields are referenced:
-				type, is_unsigned, mysql_col_len,
-				mbminlen, mbmaxlen */
+					/*!< in: MySQL column template.
+					Its following fields are referenced:
+					type, is_unsigned, mysql_col_len,
+					mbminlen, mbmaxlen */
 #ifdef UNIV_DEBUG
 	const dict_index_t* index,
-				/*!< in: InnoDB index */
+					/*!< in: InnoDB index */
 	ulint		field_no,
-				/*!< in: templ->rec_field_no or
-				templ->clust_rec_field_no or
-				templ->icp_rec_field_no */
+					/*!< in: templ->rec_field_no or
+					templ->clust_rec_field_no or
+					templ->icp_rec_field_no */
 #endif /* UNIV_DEBUG */
-	const byte*	data,	/*!< in: data to store */
-	ulint		len)	/*!< in: length of the data */
+	const byte*	data,		/*!< in: data to store */
+	ulint		len,		/*!< in: length of the data */
+	row_prebuilt_t* prebuilt)	/*!< in: use prebuilt->compress_heap only here */
 {
 	byte*			ptr;
 #ifdef UNIV_DEBUG
@@ -2634,6 +2635,13 @@ row_sel_field_store_in_mysql_format_func(
 		field_end = dest + templ->mysql_col_len;
 
 		if (templ->mysql_type == DATA_MYSQL_TRUE_VARCHAR) {
+			/* If this is a compressed column, decompress it first*/
+			if (templ->compressed)
+				data = row_decompress_column(data, &len,
+					reinterpret_cast<const byte*>(
+						templ->zip_dict_data.str),
+					templ->zip_dict_data.length, prebuilt);
+
 			/* This is a >= 5.0.3 type true VARCHAR. Store the
 			length of the data to the first byte or the first
 			two bytes of dest. */
@@ -2684,7 +2692,10 @@ row_sel_field_store_in_mysql_format_func(
 		already copied to the buffer in row_sel_store_mysql_rec */
 
 		row_mysql_store_blob_ref(dest, templ->mysql_col_len, data,
-					 len);
+					len, templ->compressed,
+					reinterpret_cast<const byte*>(
+						templ->zip_dict_data.str),
+					templ->zip_dict_data.length, prebuilt);
 		break;
 
 	case DATA_MYSQL:
@@ -2837,7 +2848,7 @@ row_sel_store_mysql_field_func(
 
 		row_sel_field_store_in_mysql_format(
 			mysql_rec + templ->mysql_col_offset,
-			templ, index, field_no, data, len);
+			templ, index, field_no, data, len, prebuilt);
 
 		if (heap != prebuilt->blob_heap) {
 			mem_heap_free(heap);
@@ -2887,7 +2898,7 @@ row_sel_store_mysql_field_func(
 
 		row_sel_field_store_in_mysql_format(
 			mysql_rec + templ->mysql_col_offset,
-			templ, index, field_no, data, len);
+			templ, index, field_no, data, len, prebuilt);
 	}
 
 	ut_ad(len != UNIV_SQL_NULL);
@@ -2934,6 +2945,9 @@ row_sel_store_mysql_rec(
 		mem_heap_free(prebuilt->blob_heap);
 		prebuilt->blob_heap = NULL;
 	}
+
+	if (UNIV_LIKELY_NULL(prebuilt->compress_heap))
+		mem_heap_empty(prebuilt->compress_heap);
 
 	for (i = 0; i < prebuilt->n_template; i++) {
 		const mysql_row_templ_t*templ = &prebuilt->mysql_template[i];

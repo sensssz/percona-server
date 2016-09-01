@@ -538,6 +538,8 @@ public:
 
    */
   bool is_created_from_null_item;
+  LEX_CSTRING zip_dict_name; // associated compression dictionary name
+  LEX_CSTRING zip_dict_data; // associated compression dictionary data
 
   Field(uchar *ptr_arg,uint32 length_arg,uchar *null_ptr_arg,
         uchar null_bit_arg, utype unireg_check_arg,
@@ -905,6 +907,14 @@ public:
     if (real_maybe_null())
       null_ptr[row_offset]|= null_bit;
   }
+  bool has_associated_compression_dictionary() const
+  { 
+    DBUG_ASSERT(zip_dict_name.str == 0 ||
+      column_format() == COLUMN_FORMAT_TYPE_COMPRESSED);
+    return column_format() == COLUMN_FORMAT_TYPE_COMPRESSED &&
+           zip_dict_name.str != 0;
+  }
+
 
   void set_notnull(my_ptrdiff_t row_offset= 0)
   {
@@ -1227,6 +1237,7 @@ public:
   void set_column_format(column_format_type column_format_arg)
   {
     DBUG_ASSERT(column_format() == COLUMN_FORMAT_TYPE_DEFAULT);
+    flags &= ~(FIELD_FLAGS_COLUMN_FORMAT_MASK);
     flags |= (column_format_arg << FIELD_FLAGS_COLUMN_FORMAT);
   }
 
@@ -1428,6 +1439,7 @@ protected:
     return from + sizeof(int64);
   }
 
+  bool has_different_compression_attributes_with(const Create_field* new_field) const;
 };
 
 
@@ -3808,6 +3820,8 @@ public:
 
   uint8 row,col,sc_length,interval_id;	// For rea_create_table
   uint	offset,pack_flag;
+  LEX_CSTRING zip_dict_name;		// Compression dictionary name
+
   Create_field() :after(NULL) {}
   Create_field(Field *field, Field *orig_field);
   /* Used to make a clone of this object for ALTER/CREATE TABLE */
@@ -3825,7 +3839,8 @@ public:
             const char *length, const char *decimals, uint type_modifier,
             Item *default_value, Item *on_update_value, LEX_STRING *comment,
             const char *change, List<String> *interval_list,
-            const CHARSET_INFO *cs, uint uint_geom_type);
+            const CHARSET_INFO *cs, uint uint_geom_type,
+            const LEX_CSTRING *zip_dict_name);
 
   ha_storage_media field_storage_type() const
   {
@@ -3837,6 +3852,12 @@ public:
   {
     return (column_format_type)
       ((flags >> FIELD_FLAGS_COLUMN_FORMAT) & 3);
+  }
+
+  void set_column_format(column_format_type column_format_arg)
+  {
+    flags &= ~(FIELD_FLAGS_COLUMN_FORMAT_MASK);
+    flags |= (column_format_arg << FIELD_FLAGS_COLUMN_FORMAT);
   }
 };
 

@@ -41,6 +41,9 @@ struct SysIndexCallback;
 
 extern ibool row_rollback_on_timeout;
 
+extern uint	srv_compressed_columns_zip_level;
+extern ulong	srv_compressed_columns_threshold;
+
 struct row_prebuilt_t;
 
 /*******************************************************************//**
@@ -51,6 +54,36 @@ row_mysql_prebuilt_free_blob_heap(
 /*==============================*/
 	row_prebuilt_t*	prebuilt);	/*!< in: prebuilt struct of a
 					ha_innobase:: table handle */
+
+/*******************************************************************//**
+Frees the compress heap in prebuilt when no longer needed. */
+UNIV_INTERN
+void
+row_mysql_prebuilt_free_compress_heap(
+/*==============================*/
+	row_prebuilt_t*	prebuilt);	/*!< in: prebuilt struct of a
+					ha_innobase:: table handle */
+/*******************************************************************//**
+Uncompress blob/text/varchar column using zlib
+@return pointer to the uncompressed data */
+const byte*
+row_decompress_column(
+	const byte*	data,		/*!< in: data in innodb(compressed) format */
+	ulint		*len,		/*!< in: data length; out: length of decompressed data*/
+	const byte*	dict_data,	/*!< in: optional dictionary data used for decompression */
+	ulint		dict_data_len,	/*!< in: optional dictionary data length */
+	row_prebuilt_t*	prebuilt);	/*!< in: use prebuilt->compress_heap only here*/
+/*******************************************************************//**
+Compress blob/text/varchar column using zlib
+@return pointer to the compressed data */
+byte*
+row_compress_column(
+	const byte*	data,		/*!< in: data in mysql(uncompressed) format */
+	ulint		*len,		/*!< in: data length; out: length of compressed data*/
+	ulint		lenlen,		/*!< in: bytes used to store the lenght of data*/
+	const byte*	dict_data,	/*!< in: optional dictionary data used for compression */
+	ulint		dict_data_len,	/*!< in: optional dictionary data length */
+	row_prebuilt_t*	prebuilt);	/*!< in: use prebuilt->compress_heap only here*/
 /*******************************************************************//**
 Stores a >= 5.0.3 format true VARCHAR length to dest, in the MySQL row
 format.
@@ -82,17 +115,21 @@ UNIV_INTERN
 void
 row_mysql_store_blob_ref(
 /*=====================*/
-	byte*		dest,	/*!< in: where to store */
-	ulint		col_len,/*!< in: dest buffer size: determines into
-				how many bytes the BLOB length is stored,
-				the space for the length may vary from 1
-				to 4 bytes */
-	const void*	data,	/*!< in: BLOB data; if the value to store
-				is SQL NULL this should be NULL pointer */
-	ulint		len);	/*!< in: BLOB length; if the value to store
-				is SQL NULL this should be 0; remember
-				also to set the NULL bit in the MySQL record
-				header! */
+	byte*		dest,			/*!< in: where to store */
+	ulint		col_len,		/*!< in: dest buffer size: determines into
+						how many bytes the BLOB length is stored,
+						the space for the length may vary from 1
+						to 4 bytes */
+	const void*	data,			/*!< in: BLOB data; if the value to store
+						is SQL NULL this should be NULL pointer */
+	ulint		len,			/*!< in: BLOB length; if the value to store
+						is SQL NULL this should be 0; remember
+						also to set the NULL bit in the MySQL record
+						header! */
+	bool		need_decompression,	/*!< in: if the data need to be compressed*/
+	const byte*	dict_data,		/*!< in: optional compression dictionary data */
+	ulint		dict_data_len,		/*!< in: optional compression dictionary data length */
+	row_prebuilt_t*	prebuilt);		/*<! in: use prebuilt->compress_heap only here*/
 /*******************************************************************//**
 Reads a reference to a BLOB in the MySQL format.
 @return	pointer to BLOB data */
@@ -100,11 +137,15 @@ UNIV_INTERN
 const byte*
 row_mysql_read_blob_ref(
 /*====================*/
-	ulint*		len,		/*!< out: BLOB length */
-	const byte*	ref,		/*!< in: BLOB reference in the
-					MySQL format */
-	ulint		col_len);	/*!< in: BLOB reference length
-					(not BLOB length) */
+	ulint*		len,			/*!< out: BLOB length */
+	const byte*	ref,			/*!< in: BLOB reference in the
+						MySQL format */
+	ulint		col_len,		/*!< in: BLOB reference length
+						(not BLOB length) */
+	bool		need_compression,	/*!< in: if the data need to be compressed*/
+	const byte*	dict_data,		/*!< in: optional compression dictionary data */
+	ulint		dict_data_len,		/*!< in: optional compression dictionary data length */
+	row_prebuilt_t*	prebuilt);		/*!< in: use prebuilt->compress_heap only here */
 /**************************************************************//**
 Pad a column with spaces. */
 UNIV_INTERN
@@ -125,34 +166,38 @@ UNIV_INTERN
 byte*
 row_mysql_store_col_in_innobase_format(
 /*===================================*/
-	dfield_t*	dfield,		/*!< in/out: dfield where dtype
-					information must be already set when
-					this function is called! */
-	byte*		buf,		/*!< in/out: buffer for a converted
-					integer value; this must be at least
-					col_len long then! NOTE that dfield
-					may also get a pointer to 'buf',
-					therefore do not discard this as long
-					as dfield is used! */
-	ibool		row_format_col,	/*!< TRUE if the mysql_data is from
-					a MySQL row, FALSE if from a MySQL
-					key value;
-					in MySQL, a true VARCHAR storage
-					format differs in a row and in a
-					key value: in a key value the length
-					is always stored in 2 bytes! */
-	const byte*	mysql_data,	/*!< in: MySQL column value, not
-					SQL NULL; NOTE that dfield may also
-					get a pointer to mysql_data,
-					therefore do not discard this as long
-					as dfield is used! */
-	ulint		col_len,	/*!< in: MySQL column length; NOTE that
-					this is the storage length of the
-					column in the MySQL format row, not
-					necessarily the length of the actual
-					payload data; if the column is a true
-					VARCHAR then this is irrelevant */
-	ulint		comp);		/*!< in: nonzero=compact format */
+	dfield_t*	dfield,			/*!< in/out: dfield where dtype
+						information must be already set when
+						this function is called! */
+	byte*		buf,			/*!< in/out: buffer for a converted
+						integer value; this must be at least
+						col_len long then! NOTE that dfield
+						may also get a pointer to 'buf',
+						therefore do not discard this as long
+						as dfield is used! */
+	ibool		row_format_col,		/*!< TRUE if the mysql_data is from
+						a MySQL row, FALSE if from a MySQL
+						key value;
+						in MySQL, a true VARCHAR storage
+						format differs in a row and in a
+						key value: in a key value the length
+						is always stored in 2 bytes! */
+	const byte*	mysql_data,		/*!< in: MySQL column value, not
+						SQL NULL; NOTE that dfield may also
+						get a pointer to mysql_data,
+						therefore do not discard this as long
+						as dfield is used! */
+	ulint		col_len,		/*!< in: MySQL column length; NOTE that
+						this is the storage length of the
+						column in the MySQL format row, not
+						necessarily the length of the actual
+						payload data; if the column is a true
+						VARCHAR then this is irrelevant */
+	ulint		comp,			/*!< in: nonzero=compact format */
+	bool		need_compression,	/*!< in: if the data need to be compressed*/
+	const byte*	dict_data,		/*!< in: optional compression dictionary data */
+	ulint		dict_data_len,		/*!< in: optional compression dictionary data length */
+	row_prebuilt_t*	prebuilt);		/*!< in: use prebuilt->compress_heap only here */
 /****************************************************************//**
 Handles user errors and lock waits detected by the database engine.
 @return true if it was a lock wait and we should continue running the
@@ -643,6 +688,8 @@ struct mysql_row_templ_t {
 	ulint	is_unsigned;		/*!< if a column type is an integer
 					type and this field is != 0, then
 					it is an unsigned integer type */
+	bool		compressed;	/*!< if column format is compressed */
+	LEX_CSTRING	zip_dict_data;	/*!< associated compression dictionary */
 };
 
 #define MYSQL_FETCH_CACHE_SIZE		8
@@ -839,6 +886,8 @@ struct row_prebuilt_t {
 					in fetch_cache */
 	mem_heap_t*	blob_heap;	/*!< in SELECTS BLOB fields are copied
 					to this heap */
+	mem_heap_t*	compress_heap;  /*!< memory heap used to compress
+					/decompress blob column*/
 	mem_heap_t*	old_vers_heap;	/*!< memory heap where a previous
 					version is built in consistent read */
 	bool		in_fts_query;	/*!< Whether we are in a FTS query */

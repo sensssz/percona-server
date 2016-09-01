@@ -1069,10 +1069,17 @@ innobase_col_to_mysql(
 		field->reset();
 
 		if (field->type() == MYSQL_TYPE_VARCHAR) {
+			if (field->column_format() == COLUMN_FORMAT_TYPE_COMPRESSED) {
+				/* Skip compressed varchar column when
+				reporting an erroneous row
+				during index creation or table rebuild. */
+				field->set_null();
+				break;
+			}
+
 			/* This is a >= 5.0.3 type true VARCHAR. Store the
 			length of the data to the first byte or the first
 			two bytes of dest. */
-
 			dest = row_mysql_store_true_var_len(
 				dest, len, flen - field->key_length());
 		}
@@ -2328,7 +2335,8 @@ innobase_build_col_map_add(
 	mem_heap_t*	heap,
 	dfield_t*	dfield,
 	const Field*	field,
-	ulint		comp)
+	ulint		comp,
+	row_prebuilt_t*	prebuilt)
 {
 	if (field->is_real_null()) {
 		dfield_set_null(dfield);
@@ -2340,7 +2348,10 @@ innobase_build_col_map_add(
 	byte*	buf	= static_cast<byte*>(mem_heap_alloc(heap, size));
 
 	row_mysql_store_col_in_innobase_format(
-		dfield, buf, TRUE, field->ptr, size, comp);
+		dfield, buf, TRUE, field->ptr, size, comp,
+		field->column_format() == COLUMN_FORMAT_TYPE_COMPRESSED,
+		(const byte*)field->zip_dict_data.str,
+		field->zip_dict_data.length, prebuilt);
 }
 
 /** Construct the translation table for reordering, dropping or
@@ -2365,7 +2376,8 @@ innobase_build_col_map(
 	const dict_table_t*	new_table,
 	const dict_table_t*	old_table,
 	dtuple_t*		add_cols,
-	mem_heap_t*		heap)
+	mem_heap_t*		heap,
+	row_prebuilt_t*	prebuilt)
 {
 	DBUG_ENTER("innobase_build_col_map");
 	DBUG_ASSERT(altered_table != table);
@@ -2404,7 +2416,7 @@ innobase_build_col_map(
 		innobase_build_col_map_add(
 			heap, dtuple_get_nth_field(add_cols, i),
 			altered_table->field[i],
-			dict_table_is_comp(new_table));
+			dict_table_is_comp(new_table), prebuilt);
 found_col:
 		i++;
 	}
@@ -2567,7 +2579,8 @@ prepare_inplace_alter_table_dict(
 	ulint			flags2,
 	ulint			fts_doc_id_col,
 	bool			add_fts_doc_id,
-	bool			add_fts_doc_id_idx)
+	bool			add_fts_doc_id_idx,
+	row_prebuilt_t* 	prebuilt)
 {
 	bool			dict_locked	= false;
 	ulint*			add_key_nums;	/* MySQL key numbers */
@@ -2578,6 +2591,7 @@ prepare_inplace_alter_table_dict(
 	dberr_t			error;
 	ulint			num_fts_index;
 	ha_innobase_inplace_ctx*ctx;
+	const char*		err_zip_field_name = 0;
 
 	DBUG_ENTER("prepare_inplace_alter_table_dict");
 
@@ -2894,7 +2908,7 @@ prepare_inplace_alter_table_dict(
 		ctx->col_map = innobase_build_col_map(
 			ha_alter_info, altered_table, old_table,
 			ctx->new_table, user_table,
-			add_cols, ctx->heap);
+			add_cols, ctx->heap, prebuilt);
 		ctx->add_cols = add_cols;
 	} else {
 		DBUG_ASSERT(!innobase_need_rebuild(ha_alter_info));
@@ -3072,6 +3086,19 @@ op_ok:
 
 	DBUG_ASSERT(error == DB_SUCCESS);
 
+	/*
+	Adding compression dictionary <-> compressed table column links
+	to the SYS_ZIP_DICT_COLS table.
+	*/
+	if (altered_table->has_compressed_columns_with_dictionaries())
+	{
+		error = innobase_create_zip_dict_references(altered_table,
+				table_name, ctx->trx->table_id, ctx->trx,
+				&err_zip_field_name);
+		if (error != DB_SUCCESS)
+			goto error_handling;
+	}
+
 	/* Commit the data dictionary transaction in order to release
 	the table locks on the system tables.  This means that if
 	MySQL crashes while creating a new primary key inside
@@ -3105,6 +3132,9 @@ error_handling:
 		break;
 	case DB_DUPLICATE_KEY:
 		my_error(ER_DUP_KEY, MYF(0), "SYS_INDEXES");
+		break;
+	case DB_RECORD_NOT_FOUND:
+		my_error(ER_COMPRESSION_DICTIONARY_DOES_NOT_EXIST, MYF(0), err_zip_field_name);
 		break;
 	default:
 		my_error_innodb(error, table_name, user_table->flags);
@@ -3893,7 +3923,7 @@ found_col:
 			    table_share->table_name.str,
 			    flags, flags2,
 			    fts_doc_col_no, add_fts_doc_id,
-			    add_fts_doc_id_idx));
+			    add_fts_doc_id_idx, prebuilt));
 }
 
 /** Alter the table structure in-place with operations

@@ -1361,6 +1361,19 @@ normalize_table_name_low(
 	ibool           set_lower_case); /* in: TRUE if we want to set
 					 name to lower case */
 
+/*****************************************************************//**
+Creates a new compression dictionary. */
+static
+handler_create_zip_dict_result
+innobase_create_zip_dict(
+/*======================*/
+	handlerton*	hton,		/*!< in: innobase handlerton */
+	THD*		thd,		/*!< in: handle to the MySQL thread */
+	const char*	name,		/*!< in: zip dictionary name */
+	ulint*		name_len,	/*!< in/out: zip dictionary name length */
+	const char*	data,		/*!< in: zip dictionary data */
+	ulint*		data_len);	/*!< in/out: zip dictionary data length */
+
 /*************************************************************//**
 Checks if buffer pool is big enough to enable backoff algorithm.
 InnoDB empty free list algorithm backoff requires free pages
@@ -1382,6 +1395,17 @@ innodb_empty_free_list_algorithm_backoff_allowed(
 						from srv_empty_free_list_t */
 	long long	buf_pool_pages);	/*!< in: total number
 						of pages inside buffer pool */
+
+/*****************************************************************//**
+Drops a existing compression dictionary. */
+static
+handler_drop_zip_dict_result
+innobase_drop_zip_dict(
+/*======================*/
+	handlerton*	hton,		/*!< in: innobase handlerton */
+	THD*		thd,		/*!< in: handle to the MySQL thread */
+	const char*	name,		/*!< in: zip dictionary name */
+	ulint*		name_len);	/*!< in/out: zip dictionary name length */
 
 /*************************************************************//**
 Removes old archived transaction log files.
@@ -3422,6 +3446,9 @@ innobase_init(
 
 	innobase_hton->kill_connection = innobase_kill_connection;
 
+	innobase_hton->create_zip_dict = innobase_create_zip_dict;
+	innobase_hton->drop_zip_dict = innobase_drop_zip_dict;
+
 	ut_a(DATA_MYSQL_TRUE_VARCHAR == (ulint)MYSQL_TYPE_VARCHAR);
 
 #ifndef DBUG_OFF
@@ -4098,6 +4125,84 @@ innobase_purge_changed_page_bitmaps(
 	ulonglong lsn)	/*!< in: LSN to purge files up to */
 {
 	return (my_bool)log_online_purge_changed_page_bitmaps(lsn);
+}
+
+/*****************************************************************//**
+Creates a new compression dictionary. */
+static
+handler_create_zip_dict_result
+innobase_create_zip_dict(
+/*======================*/
+	handlerton*	hton,		/*!< in: innobase handlerton */
+	THD*		thd,		/*!< in: handle to the MySQL thread */
+	const char*	name,		/*!< in: zip dictionary name */
+	ulint*		name_len,	/*!< in/out: zip dictionary name length */
+	const char*	data,		/*!< in: zip dictionary data */
+	ulint*		data_len)	/*!< in/out: zip dictionary data length */
+{
+	handler_create_zip_dict_result result = HA_CREATE_ZIP_DICT_UNKNOWN_ERROR;
+
+	DBUG_ENTER("innobase_create_zip_dict");
+	DBUG_ASSERT(hton == innodb_hton_ptr);
+
+	if(UNIV_UNLIKELY(*name_len > ZIP_DICT_MAX_NAME_LENGTH))
+	{
+		*name_len = ZIP_DICT_MAX_NAME_LENGTH;
+		DBUG_RETURN(HA_CREATE_ZIP_DICT_NAME_TOO_LONG);
+	}
+
+	if(UNIV_UNLIKELY(*data_len > ZIP_DICT_MAX_DATA_LENGTH))
+	{
+		*data_len = ZIP_DICT_MAX_DATA_LENGTH;
+		DBUG_RETURN(HA_CREATE_ZIP_DICT_DATA_TOO_LONG);
+	}
+
+	switch(dict_create_zip_dict(name, *name_len, data, *data_len))
+	{
+		case DB_SUCCESS:
+			result = HA_CREATE_ZIP_DICT_OK;
+			break;
+		case DB_DUPLICATE_KEY:
+			result = HA_CREATE_ZIP_DICT_ALREADY_EXISTS;
+			break;
+		default:
+			ut_ad(0);
+			result = HA_CREATE_ZIP_DICT_UNKNOWN_ERROR;
+	}
+	DBUG_RETURN(result);
+}
+/*****************************************************************//**
+Drops a existing compression dictionary. */
+static
+handler_drop_zip_dict_result
+innobase_drop_zip_dict(
+/*======================*/
+	handlerton*	hton,		/*!< in: innobase handlerton */
+	THD*		thd,		/*!< in: handle to the MySQL thread */
+	const char*	name,		/*!< in: zip dictionary name */
+	ulint*		name_len)	/*!< in/out: zip dictionary name length */
+{
+	handler_drop_zip_dict_result result = HA_DROP_ZIP_DICT_UNKNOWN_ERROR;
+
+	DBUG_ENTER("innobase_drop_zip_dict");
+	DBUG_ASSERT(hton == innodb_hton_ptr);
+
+	switch(dict_drop_zip_dict(name, *name_len))
+	{
+		case DB_SUCCESS:
+			result = HA_DROP_ZIP_DICT_OK;
+			break;
+		case DB_RECORD_NOT_FOUND:
+			result = HA_DROP_ZIP_DICT_DOES_NOT_EXIST;
+			break;
+		case DB_ROW_IS_REFERENCED:
+			result = HA_DROP_ZIP_DICT_IS_REFERENCED;
+			break;
+		default:
+			ut_ad(0);
+			result = HA_DROP_ZIP_DICT_UNKNOWN_ERROR;
+	}
+	DBUG_RETURN(result);
 }
 
 /*****************************************************************//**
@@ -5461,6 +5566,54 @@ func_exit:
 }
 
 /*******************************************************************//**
+This function creates compression dictionary references in
+SYS_ZIP_DICT_COLS InnoDB system table for table_id based on info
+in table->fields.
+@return DB_SUCCESS if references created successfully */
+UNIV_INTERN
+dberr_t
+innobase_create_zip_dict_references(
+/*=============================*/
+	const TABLE*	table,		/*!< in: table in MySQL data
+					dictionary */
+	const char*	table_name,	/*!< in: table name */
+	table_id_t	ib_table_id,	/*!< in: table ID in Innodb data
+					dictionary */
+	trx_t*		trx,		/*!< in: transaction */
+	const char**	err_field)	/*!< out: field name for which
+					zip_dict reference cannot be
+					created. */
+{
+	dberr_t res = DB_SUCCESS;
+	DBUG_ENTER("innobase_create_zip_dict_references");
+	Field** zip_field_ptr = table->field;
+	while (res == DB_SUCCESS && *zip_field_ptr != 0)
+	{
+		if ((*zip_field_ptr)->has_associated_compression_dictionary())
+		{
+			res = dict_create_add_zip_dict_reference(ib_table_id,
+				(*zip_field_ptr)->field_index, (*zip_field_ptr)->zip_dict_name.str,
+				(*zip_field_ptr)->zip_dict_name.length, trx);
+		}
+		++zip_field_ptr;
+	}
+	if (res != DB_SUCCESS)
+	{
+		trx->error_state = DB_SUCCESS;
+		trx_rollback_to_savepoint(trx, NULL);
+		row_drop_table_for_mysql(table_name, trx, FALSE);
+		trx_commit_for_mysql(trx);
+		trx->error_state = DB_SUCCESS;
+		if (err_field != 0)
+		{
+			--zip_field_ptr;
+			*err_field = (*zip_field_ptr)->zip_dict_name.str;
+		}
+	}
+
+	DBUG_RETURN(res);
+}
+/*******************************************************************//**
 This function uses index translation table to quickly locate the
 requested index structure.
 Note we do not have mutex protection for the index translatoin table
@@ -6749,7 +6902,10 @@ ha_innobase::store_key_val_for_row(
 			blob_data = row_mysql_read_blob_ref(&blob_len,
 				(byte*) (record
 				+ (ulint) get_field_offset(table, field)),
-					(ulint) field->pack_length());
+				(ulint) field->pack_length(),
+				field->column_format() == COLUMN_FORMAT_TYPE_COMPRESSED,
+				(const byte*)field->zip_dict_data.str,
+				field->zip_dict_data.length, prebuilt);
 
 			true_len = blob_len;
 
@@ -7004,6 +7160,9 @@ build_template_field(
 	templ->mbminlen = dict_col_get_mbminlen(col);
 	templ->mbmaxlen = dict_col_get_mbmaxlen(col);
 	templ->is_unsigned = col->prtype & DATA_UNSIGNED;
+	templ->compressed = (field->column_format()
+				== COLUMN_FORMAT_TYPE_COMPRESSED);
+	templ->zip_dict_data = field->zip_dict_data;
 
 	if (!dict_index_is_clust(index)
 	    && templ->rec_field_no == ULINT_UNDEFINED) {
@@ -7758,8 +7917,9 @@ calc_row_difference(
 		switch (col_type) {
 
 		case DATA_BLOB:
-			o_ptr = row_mysql_read_blob_ref(&o_len, o_ptr, o_len);
-			n_ptr = row_mysql_read_blob_ref(&n_len, n_ptr, n_len);
+			/* Do not compress blob column while comparing*/
+			o_ptr = row_mysql_read_blob_ref(&o_len, o_ptr, o_len, false, 0, 0, prebuilt);
+			n_ptr = row_mysql_read_blob_ref(&n_len, n_ptr, n_len, false, 0, 0, prebuilt);
 
 			break;
 
@@ -7829,7 +7989,11 @@ calc_row_difference(
 					TRUE,
 					new_mysql_row_col,
 					col_pack_len,
-					dict_table_is_comp(prebuilt->table));
+					dict_table_is_comp(prebuilt->table),
+					field->column_format() == COLUMN_FORMAT_TYPE_COMPRESSED,
+					(const byte*)field->zip_dict_data.str,
+					field->zip_dict_data.length,
+					prebuilt);
 				dfield_copy(&ufield->new_val, &dfield);
 			} else {
 				dfield_set_null(&ufield->new_val);
@@ -10699,6 +10863,36 @@ ha_innobase::create(
 		dict_table_get_all_fts_indexes(innobase_table, fts->indexes);
 	}
 
+	/*
+	Adding compression dictionary <-> compressed table column links
+	to the SYS_ZIP_DICT_COLS table.
+	*/
+	if(form->has_compressed_columns_with_dictionaries())
+	{
+		innobase_table = dict_table_open_on_name(
+			norm_name, TRUE, FALSE, DICT_ERR_IGNORE_NONE);
+
+		ut_a(innobase_table);
+		table_id_t table_id = innobase_table->id;
+		dict_table_close(innobase_table, TRUE, FALSE);
+		const char* err_zip_field_name = 0;
+		dberr_t zip_dict_err = innobase_create_zip_dict_references(form, norm_name,
+			table_id, trx, &err_zip_field_name);
+		if (zip_dict_err != DB_SUCCESS) {
+			switch (zip_dict_err)
+			{
+				case DB_RECORD_NOT_FOUND:
+					my_error(ER_COMPRESSION_DICTIONARY_DOES_NOT_EXIST,
+						MYF(0), err_zip_field_name);
+					break;
+				default:
+					my_error(ER_UNKNOWN_ERROR, MYF(0));
+			}
+			error = -1;
+			goto cleanup;
+		}
+	}
+
 	stmt = innobase_get_stmt(thd, &stmt_len);
 
 	if (stmt) {
@@ -13047,6 +13241,11 @@ ha_innobase::extra(
 		if (prebuilt->blob_heap) {
 			row_mysql_prebuilt_free_blob_heap(prebuilt);
 		}
+
+		if (prebuilt->compress_heap) {
+			row_mysql_prebuilt_free_compress_heap(prebuilt);
+		}
+
 		break;
 	case HA_EXTRA_RESET_STATE:
 		reset_template();
@@ -13096,6 +13295,10 @@ ha_innobase::reset()
 {
 	if (prebuilt->blob_heap) {
 		row_mysql_prebuilt_free_blob_heap(prebuilt);
+	}
+
+	if (prebuilt->compress_heap) {
+		row_mysql_prebuilt_free_compress_heap(prebuilt);
 	}
 
 	reset_template();
@@ -14996,6 +15199,77 @@ ha_innobase::check_if_incompatible_data(
 	}
 
 	return(COMPATIBLE_DATA_YES);
+}
+
+/*******************************************************************//**
+*/
+UNIV_INTERN
+void
+ha_innobase::update_field_defs_with_zip_dict_info()
+{
+	DBUG_ENTER("update_field_defs_with_zip_dict_info");
+	ut_ad(!mutex_own(&dict_sys->mutex));
+
+	char norm_name[FN_REFLEN];
+	normalize_table_name(norm_name, table_share->normalized_path.str);
+
+	dict_table_t* ib_table = dict_table_open_on_name(
+		norm_name, FALSE, FALSE, DICT_ERR_IGNORE_NONE);
+
+	/* if dict_table_open_on_name() returns NULL, then it means that
+	TABLE_SHARE is populated for a table being created and we can
+	skip filling zip dict info here */
+	if (ib_table == 0)
+		DBUG_VOID_RETURN;
+
+	table_id_t ib_table_id = ib_table->id;
+	dict_table_close(ib_table, FALSE, FALSE);
+	Field* field;
+	for (uint i = 0; i < table_share->fields; ++i)
+	{
+		field = table_share->field[i];
+		if (field->column_format() == COLUMN_FORMAT_TYPE_COMPRESSED)
+		{
+			bool reference_found = false;
+			ulint dict_id = 0;
+			switch (dict_get_dictionary_id_by_key(ib_table_id, i, &dict_id))
+			{
+				case DB_SUCCESS:
+					reference_found = true;
+					break;
+				case DB_RECORD_NOT_FOUND:
+					reference_found = false;
+					break;
+				default:
+					ut_error;
+			}
+			if (reference_found)
+			{
+				char* local_name = 0;
+				ulint local_name_len = 0;
+				char* local_data = 0;
+				ulint local_data_len = 0;
+				if (dict_get_dictionary_info_by_id(dict_id, &local_name, &local_name_len,
+					&local_data, &local_data_len) != DB_SUCCESS)
+				{
+					ut_error;
+				}
+				else
+				{
+					field->zip_dict_name.str = local_name;
+					field->zip_dict_name.length = local_name_len;
+					field->zip_dict_data.str = local_data;
+					field->zip_dict_data.length = local_data_len;
+				}
+			}
+			else
+			{
+				field->zip_dict_name = null_lex_cstr;
+				field->zip_dict_data = null_lex_cstr;
+			}
+		}
+	}
+	DBUG_VOID_RETURN;
 }
 
 /****************************************************************//**
@@ -18337,6 +18611,17 @@ static MYSQL_SYSVAR_BOOL(locking_fake_changes, srv_fake_changes_locks,
   "not take any locks at all.",
   NULL, NULL, TRUE);
 
+static MYSQL_SYSVAR_UINT(compressed_columns_zip_level, srv_compressed_columns_zip_level,
+  PLUGIN_VAR_RQCMDARG,
+  "Compression level used for compressed columns.  0 is no compression"
+  ", 1 is fastest and 9 is best compression. Default is 6.",
+  NULL, NULL, DEFAULT_COMPRESSION_LEVEL, 0, 9, 0);
+
+static MYSQL_SYSVAR_ULONG(compressed_columns_threshold, srv_compressed_columns_threshold,
+  PLUGIN_VAR_RQCMDARG,
+  "Compress column data if its length exceeds this value. Default is 96",
+  NULL, NULL, 96, 1, ~0UL, 0);
+
 static struct st_mysql_sys_var* innobase_system_variables[]= {
   MYSQL_SYSVAR(log_block_size),
   MYSQL_SYSVAR(additional_mem_pool_size),
@@ -18534,6 +18819,8 @@ static struct st_mysql_sys_var* innobase_system_variables[]= {
   MYSQL_SYSVAR(fake_changes),
   MYSQL_SYSVAR(locking_fake_changes),
   MYSQL_SYSVAR(tmpdir),
+  MYSQL_SYSVAR(compressed_columns_zip_level),
+  MYSQL_SYSVAR(compressed_columns_threshold),
   NULL
 };
 
@@ -18556,6 +18843,8 @@ mysql_declare_plugin(innobase)
 i_s_xtradb_read_view,
 i_s_xtradb_internal_hash_tables,
 i_s_xtradb_rseg,
+i_s_xtradb_zip_dict,
+i_s_xtradb_zip_dict_cols,
 i_s_innodb_trx,
 i_s_innodb_locks,
 i_s_innodb_lock_waits,

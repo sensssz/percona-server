@@ -9543,6 +9543,10 @@ bool is_equal(const LEX_STRING *a, const LEX_STRING *b)
 {
   return a->length == b->length && !strncmp(a->str, b->str, a->length);
 }
+bool is_equal(const LEX_CSTRING *a, const LEX_CSTRING *b)
+{
+  return a->length == b->length && !strncmp(a->str, b->str, a->length);
+}
 
 static bool is_cond_equal(const Item *cond)
 {

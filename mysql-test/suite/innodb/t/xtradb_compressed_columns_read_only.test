@@ -1,0 +1,65 @@
+--source include/have_innodb.inc
+
+--echo # Defining compression dictionary content.
+SET @dictionary_data = 'one' 'two' 'three' 'four';
+
+--echo # Creating a compression dictionary.
+CREATE COMPRESSION_DICTIONARY numbers (@dictionary_data);
+
+CREATE TABLE t1(
+  id INT,
+  a BLOB COLUMN_FORMAT COMPRESSED WITH COMPRESSION_DICTIONARY numbers
+) ENGINE=InnoDB;
+
+--echo # Defining a JSON-formatted value which can be well compressed with the created dictionary.
+SET @json_value =
+  '[\n'
+  '  {\n'
+  '    "one" = 0,\n'
+  '    "two" = 0,\n'
+  '    "three" = 0,\n'
+  '    "four" = 0\n'
+  '  },\n'
+  '  {\n'
+  '    "one" = 0,\n'
+  '    "two" = 0,\n'
+  '    "three" = 0,\n'
+  '    "four" = 0\n'
+  '  },\n'
+  '  {\n'
+  '    "one" = 0,\n'
+  '    "two" = 0,\n'
+  '    "three" = 0,\n'
+  '    "four" = 0\n'
+  '  },\n'
+  '  {\n'
+  '    "one" = 0,\n'
+  '    "two" = 0,\n'
+  '    "three" = 0,\n'
+  '    "four" = 0\n'
+  '  }\n'
+  ']\n'
+;
+--let $permanent_json_value = `SELECT @json_value`
+
+--echo # Filling the table with some records.
+INSERT INTO t1 VALUES(0, @json_value);
+
+--echo # Reading table data.
+SELECT COUNT(*) = 1 AS number_of_rows_matches FROM t1 WHERE a = @json_value;
+
+--echo # Restarting with --innodb-read-only.
+--let $restart_parameters = restart:--innodb-read-only
+--source include/restart_mysqld.inc
+
+--echo # Reading table data in read-only mode.
+eval SET @json_value = '$permanent_json_value';
+SELECT COUNT(*) = 1 AS number_of_rows_matches FROM t1 WHERE a = @json_value;
+
+--echo # Restarting woth default options.
+--let $restart_parameters =
+--source include/restart_mysqld.inc
+
+--echo # Cleaning up.
+DROP TABLE t1;
+DROP COMPRESSION_DICTIONARY numbers;

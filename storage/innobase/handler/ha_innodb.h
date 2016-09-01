@@ -287,6 +287,8 @@ class ha_innobase: public handler
 	/** @} */
 	bool check_if_incompatible_data(HA_CREATE_INFO *info,
 					uint table_changes);
+	virtual void update_field_defs_with_zip_dict_info();
+
 private:
 	/** Builds a 'template' to the prebuilt struct.
 
@@ -665,3 +667,21 @@ innobase_build_index_translation(
 	INNOBASE_SHARE*		share);	  /*!< in/out: share structure
 					  where index translation table
 					  will be constructed in. */
+/*******************************************************************//**
+This function creates compression dictionary references in
+SYS_ZIP_DICT_COLS InnoDB system table for table_id based on info
+in table->fields.
+@return DB_SUCCESS if references created successfully */
+UNIV_INTERN
+dberr_t
+innobase_create_zip_dict_references(
+/*=============================*/
+	const TABLE*	table,		/*!< in: table in MySQL data
+					dictionary */
+	const char*	table_name,	/*!< in: table name */
+	table_id_t	ib_table_id,	/*!< in: table ID in Innodb data
+					dictionary */
+	trx_t*		trx,		/*!< in: transaction */
+	const char**	err_field);	/*!< out: field name for which
+					zip_dict reference cannot be
+					created. */
