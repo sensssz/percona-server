@@ -56,6 +56,10 @@ int mysql_create_zip_dict(THD* thd, const char* name, ulong name_len, const char
         error = ER_COMPRESSION_DICTIONARY_EXISTS;
         my_error(error, MYF(0), name);
         break;
+      case HA_CREATE_ZIP_DICT_READ_ONLY:
+        error = ER_READ_ONLY_MODE;
+        my_error(error, MYF(0));
+        break;
       default:
         DBUG_ASSERT(0);
         error = ER_UNKNOWN_ERROR;
@@ -96,6 +100,10 @@ int mysql_drop_zip_dict(THD* thd, const char* name, ulong name_len)
       case HA_DROP_ZIP_DICT_IS_REFERENCED:
         error = ER_COMPRESSION_DICTIONARY_IS_REFERENCED;
         my_error(error, MYF(0), name);
+        break;
+      case HA_DROP_ZIP_DICT_READ_ONLY:
+        error = ER_READ_ONLY_MODE;
+        my_error(error, MYF(0));
         break;
       default:
         DBUG_ASSERT(0);

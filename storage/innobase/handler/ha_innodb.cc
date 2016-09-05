@@ -4145,6 +4145,10 @@ innobase_create_zip_dict(
 	DBUG_ENTER("innobase_create_zip_dict");
 	DBUG_ASSERT(hton == innodb_hton_ptr);
 
+	if(UNIV_UNLIKELY(high_level_read_only)) {
+		DBUG_RETURN(HA_CREATE_ZIP_DICT_READ_ONLY);
+	}
+
 	if(UNIV_UNLIKELY(*name_len > ZIP_DICT_MAX_NAME_LENGTH))
 	{
 		*name_len = ZIP_DICT_MAX_NAME_LENGTH;
@@ -4186,6 +4190,10 @@ innobase_drop_zip_dict(
 
 	DBUG_ENTER("innobase_drop_zip_dict");
 	DBUG_ASSERT(hton == innodb_hton_ptr);
+
+	if (UNIV_UNLIKELY(high_level_read_only)) {
+		DBUG_RETURN(HA_DROP_ZIP_DICT_READ_ONLY);
+	}
 
 	switch(dict_drop_zip_dict(name, *name_len))
 	{
@@ -13500,7 +13508,9 @@ ha_innobase::external_lock(
 		    && lock_type == F_WRLCK)
 		|| thd_sql_command(thd) == SQLCOM_CREATE_INDEX
 		|| thd_sql_command(thd) == SQLCOM_DROP_INDEX
-		|| thd_sql_command(thd) == SQLCOM_DELETE)) {
+		|| thd_sql_command(thd) == SQLCOM_DELETE
+		|| thd_sql_command(thd) == SQLCOM_CREATE_COMPRESSION_DICTIONARY
+		|| thd_sql_command(thd) == SQLCOM_DROP_COMPRESSION_DICTIONARY)) {
 
 		if (thd_sql_command(thd) == SQLCOM_CREATE_TABLE)
 		{
@@ -14262,7 +14272,9 @@ ha_innobase::store_lock(
 			 && lock_type <= TL_WRITE))
 		|| sql_command == SQLCOM_CREATE_INDEX
 		|| sql_command == SQLCOM_DROP_INDEX
-		|| sql_command == SQLCOM_DELETE)) {
+		|| sql_command == SQLCOM_DELETE
+		|| sql_command == SQLCOM_CREATE_COMPRESSION_DICTIONARY
+		|| sql_command == SQLCOM_DROP_COMPRESSION_DICTIONARY)) {
 
 		ib_senderrf(trx->mysql_thd,
 			    IB_LOG_LEVEL_WARN, ER_READ_ONLY_MODE);

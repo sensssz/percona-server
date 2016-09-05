@@ -126,7 +126,7 @@ SET @create_zip_dict_sql = CONCAT('CREATE COMPRESSION_DICTIONARY dict(\'', @numb
 PREPARE create_zip_dict_stmt FROM @create_zip_dict_sql;
 EXECUTE create_zip_dict_stmt;
 DEALLOCATE PREPARE create_zip_dict_stmt;
-SET @create_table_referencing_zip_dict_sql = 
+SET @create_table_referencing_zip_dict_sql =
 'CREATE TABLE t1('
   '  id INT,'
   '  a BLOB COLUMN_FORMAT COMPRESSED WITH COMPRESSION_DICTIONARY dict'

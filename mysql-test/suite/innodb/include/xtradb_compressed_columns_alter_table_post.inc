@@ -28,7 +28,7 @@ if($need_check_for_original_dictionary_reference_cleared)
 
 if(!$storage_engine_changed)
 {
-  eval SELECT table_id INTO @modified_table_id FROM information_schema.innodb_sys_tables 
+  eval SELECT table_id INTO @modified_table_id FROM information_schema.innodb_sys_tables
     WHERE name=CONCAT(DATABASE(), '/', '$modified_table_name');
   eval SELECT pos INTO @modified_column_pos FROM information_schema.innodb_sys_columns
     WHERE table_id = @modified_table_id AND name = '$modified_column_name';
@@ -37,7 +37,7 @@ if(!$storage_engine_changed)
   {
     eval SELECT id INTO @modified_dict_id FROM information_schema.xtradb_zip_dict
       WHERE name = '$modified_dict_name';
-    let $modified_dictionary_reference_exists = `SELECT COUNT(*) = 1 
+    let $modified_dictionary_reference_exists = `SELECT COUNT(*) = 1
       FROM information_schema.xtradb_zip_dict_cols
       WHERE table_id = @modified_table_id AND column_pos = @modified_column_pos`;
     --eval SELECT $modified_dictionary_reference_exists AS modified_dictionary_reference_exists

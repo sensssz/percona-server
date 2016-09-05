@@ -908,7 +908,7 @@ public:
       null_ptr[row_offset]|= null_bit;
   }
   bool has_associated_compression_dictionary() const
-  { 
+  {
     DBUG_ASSERT(zip_dict_name.str == 0 ||
       column_format() == COLUMN_FORMAT_TYPE_COMPRESSED);
     return column_format() == COLUMN_FORMAT_TYPE_COMPRESSED &&

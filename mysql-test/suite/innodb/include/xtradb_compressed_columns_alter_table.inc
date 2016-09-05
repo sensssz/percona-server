@@ -31,7 +31,7 @@ if($alter_table_algorithm == 'INPLACE')
     --let $expected_error = ER_ALTER_OPERATION_NOT_SUPPORTED_REASON
   }
 }
-let $alter_table_statement = ALTER TABLE $original_table_name 
+let $alter_table_statement = ALTER TABLE $original_table_name
   CHANGE COLUMN $original_column_name $modified_column_name $modified_column_definition,
   ALGORITHM = $alter_table_algorithm;
 if($expected_error)

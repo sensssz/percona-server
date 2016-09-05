@@ -6879,8 +6879,8 @@ attribute:
 opt_with_compression_dictionary:
           /* empty */ { $$= null_lex_cstr; }
         | WITH COMPRESSION_DICTIONARY_SYM ident
-          { 
-            /* 
+          {
+            /*
               no single assignment because of
               LEX_STRING -> LEX_CSTRING conversion
             */

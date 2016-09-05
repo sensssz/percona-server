@@ -97,7 +97,7 @@ Huffman codes, allowing for a simpler decoder for special applications.
 const uint	srv_compressed_columns_zlib_strategy = Z_DEFAULT_STRATEGY;
 /** Compress the column if the data length exceeds this value. */
 UNIV_INTERN ulong	srv_compressed_columns_threshold = 96;
-/** 
+/**
 Determine if zlib needs to compute adler32 value for the compressed data.
 This variables is similar to page_zip_zlib_wrap, but only used by
 compressed blob columns.
@@ -416,7 +416,7 @@ row_compress_column(
 		err = deflateSetDictionary(&c_stream, dict_data, dict_data_len);
 		ut_a(err == Z_OK);
 	}
-	
+
 	err = deflate(&c_stream, Z_FINISH);
 	if (err != Z_STREAM_END) {
 		deflateEnd(&c_stream);
@@ -3241,7 +3241,7 @@ row_mysql_table_id_reassign(
 
 	pars_info_add_ull_literal(info, "old_id", table->id);
 	pars_info_add_ull_literal(info, "new_id", *new_id);
-	
+
 	/* As micro-SQL does not support int4 == int8 comparisons,
 	old and new IDs are added again under different names as
 	int4 values*/

@@ -16,15 +16,15 @@
 --let $modified_column_name = $original_column_name
 --let $modified_column_type = $original_column_type
 
-# checks for various 'ALTER TABLE' statements with 'ALGORITHM=DEFAULT' 
+# checks for various 'ALTER TABLE' statements with 'ALGORITHM=DEFAULT'
 --let $alter_table_algorithm = DEFAULT
 --source suite/innodb/include/xtradb_compressed_columns_alter_table_set.inc
 
-# checks for various 'ALTER TABLE' statements with 'ALGORITHM=COPY' 
+# checks for various 'ALTER TABLE' statements with 'ALGORITHM=COPY'
 --let $alter_table_algorithm = COPY
 --source suite/innodb/include/xtradb_compressed_columns_alter_table_set.inc
 
-# checks for various 'ALTER TABLE' statements with 'ALGORITHM=INPLACE' 
+# checks for various 'ALTER TABLE' statements with 'ALGORITHM=INPLACE'
 --let $alter_table_algorithm = INPLACE
 --source suite/innodb/include/xtradb_compressed_columns_alter_table_set.inc
 

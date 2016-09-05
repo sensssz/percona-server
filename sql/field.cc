@@ -1892,7 +1892,7 @@ Field *Field::new_field(MEM_ROOT *root, TABLE *new_table,
   */
   tmp->unireg_check= Field::NONE;
   /* COMPRESSED column format flag must not be cleared here */
-  bool has_compressed_flag = 
+  bool has_compressed_flag =
     (tmp->column_format() == COLUMN_FORMAT_TYPE_COMPRESSED);
   tmp->flags&= (NOT_NULL_FLAG | BLOB_FLAG | UNSIGNED_FLAG |
                 ZEROFILL_FLAG | BINARY_FLAG | ENUM_FLAG | SET_FLAG);
