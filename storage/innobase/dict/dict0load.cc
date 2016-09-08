@@ -730,14 +730,12 @@ err_len:
 	return(NULL);
 }
 
-/********************************************************************//**
-This function parses a SYS_ZIP_DICT record, extracts necessary
+/** This function parses a SYS_ZIP_DICT record, extracts necessary
 information from the record and returns to caller.
 @return error message, or NULL on success */
 UNIV_INTERN
 const char*
 dict_process_sys_zip_dict(
-/*=========================*/
 	mem_heap_t*	heap,		/*!< in/out: heap memory */
 	ulint		zip_size,	/*!< in: nonzero=compressed BLOB page size */
 	const rec_t*	rec,		/*!< in: current SYS_ZIP_DICT rec */
@@ -750,10 +748,10 @@ dict_process_sys_zip_dict(
 	const byte*	field;
 
 	/* Initialize the output values */
-	*id = ULINT_UNDEFINED;
-	*name = NULL;
-	*data = NULL;
-	*data_len = 0;
+	*id= ULINT_UNDEFINED;
+	*name= NULL;
+	*data= NULL;
+	*data_len= 0;
 
 	if (UNIV_UNLIKELY(rec_get_deleted_flag(rec, 0))) {
 		return("delete-marked record in SYS_ZIP_DICT");
@@ -763,12 +761,12 @@ dict_process_sys_zip_dict(
 		return("wrong number of columns in SYS_ZIP_DICT record");
 	}
 
-	field = rec_get_nth_field_old(
+	field= rec_get_nth_field_old(
 		rec, DICT_FLD__SYS_ZIP_DICT__ID, &len);
 	if (UNIV_UNLIKELY(len != DICT_FLD_LEN_SPACE)) {
 		goto err_len;
 	}
-	*id = mach_read_from_4(field);
+	*id= mach_read_from_4(field);
 
 	rec_get_nth_field_offs_old(
 		rec, DICT_FLD__SYS_ZIP_DICT__DB_TRX_ID, &len);
@@ -782,20 +780,20 @@ dict_process_sys_zip_dict(
 		goto err_len;
 	}
 
-	field = rec_get_nth_field_old(
+	field= rec_get_nth_field_old(
 		rec, DICT_FLD__SYS_ZIP_DICT__NAME, &len);
 	if (UNIV_UNLIKELY(len == 0 || len == UNIV_SQL_NULL)) {
 		goto err_len;
 	}
-	*name = mem_heap_strdupl(heap, (char*) field, len);
+	*name= mem_heap_strdupl(heap, (char*) field, len);
 
-	field = rec_get_nth_field_old(
+	field= rec_get_nth_field_old(
 		rec, DICT_FLD__SYS_ZIP_DICT__DATA, &len);
 	if (UNIV_UNLIKELY(len == UNIV_SQL_NULL)) {
 		goto err_len;
 	}
 
-	if(rec_get_1byte_offs_flag(rec) == 0 && rec_2_is_field_extern(rec, DICT_FLD__SYS_ZIP_DICT__DATA))
+	if (rec_get_1byte_offs_flag(rec) == 0 && rec_2_is_field_extern(rec, DICT_FLD__SYS_ZIP_DICT__DATA))
 	{
 		ut_a(len >= BTR_EXTERN_FIELD_REF_SIZE);
 
@@ -805,13 +803,14 @@ dict_process_sys_zip_dict(
 		{
 			goto err_len;
 		}
-		*data = (char*)btr_copy_externally_stored_field(data_len, field,
-							zip_size, len, heap);
+		*data= reinterpret_cast<char*>(
+			btr_copy_externally_stored_field(data_len, field,
+							zip_size, len, heap));
 	}
 	else
 	{
-		*data_len = len;
-		*data = (char*)mem_heap_dup(heap, field, len);
+		*data_len= len;
+		*data= static_cast<char*>(mem_heap_dup(heap, field, len));
 	}
 
 	return(NULL);
@@ -820,14 +819,12 @@ err_len:
 	return("incorrect column length in SYS_ZIP_DICT");
 }
 
-/********************************************************************//**
-This function parses a SYS_ZIP_DICT_COLS record, extracts necessary
+/** This function parses a SYS_ZIP_DICT_COLS record, extracts necessary
 information from the record and returns to caller.
 @return error message, or NULL on success */
 UNIV_INTERN
 const char*
 dict_process_sys_zip_dict_cols(
-/*=========================*/
 	mem_heap_t*	heap,		/*!< in/out: heap memory */
 	const rec_t*	rec,		/*!< in: current SYS_ZIP_DICT rec */
 	ulint*		table_id,	/*!< out: table id */
@@ -838,9 +835,9 @@ dict_process_sys_zip_dict_cols(
 	const byte*	field;
 
 	/* Initialize the output values */
-	*table_id = ULINT_UNDEFINED;
-	*column_pos = ULINT_UNDEFINED;
-	*dict_id = ULINT_UNDEFINED;
+	*table_id= ULINT_UNDEFINED;
+	*column_pos= ULINT_UNDEFINED;
+	*dict_id= ULINT_UNDEFINED;
 
 	if (UNIV_UNLIKELY(rec_get_deleted_flag(rec, 0))) {
 		return("delete-marked record in SYS_ZIP_DICT_COLS");
@@ -850,20 +847,20 @@ dict_process_sys_zip_dict_cols(
 		return("wrong number of columns in SYS_ZIP_DICT_COLS record");
 	}
 
-	field = rec_get_nth_field_old(
+	field= rec_get_nth_field_old(
 		rec, DICT_FLD__SYS_ZIP_DICT_COLS__TABLE_ID, &len);
 	if (UNIV_UNLIKELY(len != DICT_FLD_LEN_SPACE)) {
 err_len:
 		return("incorrect column length in SYS_ZIP_DICT_COLS");
 	}
-	*table_id = mach_read_from_4(field);
+	*table_id= mach_read_from_4(field);
 
-	field = rec_get_nth_field_old(
+	field= rec_get_nth_field_old(
 		rec, DICT_FLD__SYS_ZIP_DICT_COLS__COLUMN_POS, &len);
 	if (UNIV_UNLIKELY(len != DICT_FLD_LEN_SPACE)) {
 		goto err_len;
 	}
-	*column_pos = mach_read_from_4(field);
+	*column_pos= mach_read_from_4(field);
 
 	rec_get_nth_field_offs_old(
 		rec, DICT_FLD__SYS_ZIP_DICT_COLS__DB_TRX_ID, &len);
@@ -877,12 +874,12 @@ err_len:
 		goto err_len;
 	}
 
-	field = rec_get_nth_field_old(
+	field= rec_get_nth_field_old(
 		rec, DICT_FLD__SYS_ZIP_DICT_COLS__DICT_ID, &len);
 	if (UNIV_UNLIKELY(len != DICT_FLD_LEN_SPACE)) {
 		goto err_len;
 	}
-	*dict_id = mach_read_from_4(field);
+	*dict_id= mach_read_from_4(field);
 
 	return(NULL);
 }

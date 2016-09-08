@@ -48,8 +48,8 @@ sys_var *trg_new_row_fake_var= (sys_var*) 0x01;
 */
 const LEX_STRING null_lex_str= {NULL, 0};
 const LEX_STRING empty_lex_str= {(char *) "", 0};
-const LEX_CSTRING null_lex_cstr = { NULL, 0 };
-const LEX_CSTRING empty_lex_cstr = { "", 0 };
+const LEX_CSTRING null_lex_cstr= {NULL, 0};
+const LEX_CSTRING empty_lex_cstr= {"", 0};
 /**
   @note The order of the elements of this array must correspond to
   the order of elements in enum_binlog_stmt_unsafe.

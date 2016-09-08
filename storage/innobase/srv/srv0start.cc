@@ -2715,7 +2715,7 @@ files_checked:
 	}
 
 	/* Create the SYS_ZIP_DICT system table */
-	err = dict_create_or_check_sys_zip_dict();
+	err= dict_create_or_check_sys_zip_dict();
 	if (err != DB_SUCCESS) {
 		return(err);
 	}

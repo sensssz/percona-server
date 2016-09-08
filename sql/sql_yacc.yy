@@ -2534,8 +2534,8 @@ create:
         | CREATE COMPRESSION_DICTIONARY_SYM ident '(' create_compression_dictionary_allowed_expr ')'
           {
             Lex->sql_command= SQLCOM_CREATE_COMPRESSION_DICTIONARY;
-            Lex->ident = $3;
-            Lex->default_value = $5;
+            Lex->ident= $3;
+            Lex->default_value= $5;
           }
         ;
 /*
@@ -6857,7 +6857,7 @@ attribute:
             Lex->type&= ~(FIELD_FLAGS_COLUMN_FORMAT_MASK);
             Lex->type|=
               (COLUMN_FORMAT_TYPE_COMPRESSED << FIELD_FLAGS_COLUMN_FORMAT);
-            Lex->zip_dict_name = $3;
+            Lex->zip_dict_name= $3;
           }
         | STORAGE_SYM DEFAULT
           {
@@ -12047,8 +12047,8 @@ drop:
           }
         | DROP COMPRESSION_DICTIONARY_SYM ident
           {
-            Lex->sql_command = SQLCOM_DROP_COMPRESSION_DICTIONARY;
-            Lex->ident = $3;
+            Lex->sql_command= SQLCOM_DROP_COMPRESSION_DICTIONARY;
+            Lex->ident= $3;
           }
         ;
 

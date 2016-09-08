@@ -1080,6 +1080,7 @@ innobase_col_to_mysql(
 			/* This is a >= 5.0.3 type true VARCHAR. Store the
 			length of the data to the first byte or the first
 			two bytes of dest. */
+
 			dest = row_mysql_store_true_var_len(
 				dest, len, flen - field->key_length());
 		}
@@ -2350,7 +2351,7 @@ innobase_build_col_map_add(
 	row_mysql_store_col_in_innobase_format(
 		dfield, buf, TRUE, field->ptr, size, comp,
 		field->column_format() == COLUMN_FORMAT_TYPE_COMPRESSED,
-		(const byte*)field->zip_dict_data.str,
+		reinterpret_cast<const byte*>(field->zip_dict_data.str),
 		field->zip_dict_data.length, prebuilt);
 }
 
@@ -2591,7 +2592,7 @@ prepare_inplace_alter_table_dict(
 	dberr_t			error;
 	ulint			num_fts_index;
 	ha_innobase_inplace_ctx*ctx;
-	const char*		err_zip_field_name = 0;
+	const char*		err_zip_field_name= 0;
 
 	DBUG_ENTER("prepare_inplace_alter_table_dict");
 
@@ -3092,7 +3093,7 @@ op_ok:
 	*/
 	if (altered_table->has_compressed_columns_with_dictionaries())
 	{
-		error = innobase_create_zip_dict_references(altered_table,
+		error= innobase_create_zip_dict_references(altered_table,
 				table_name, ctx->trx->table_id, ctx->trx,
 				&err_zip_field_name);
 		if (error != DB_SUCCESS)

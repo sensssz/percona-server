@@ -19,14 +19,14 @@
 --source suite/innodb/include/xtradb_compressed_columns_alter_table_pre.inc
 
 --let $expected_error =
-if($modified_dict_name == 'unknown')
+if ($modified_dict_name == 'unknown')
 {
   --let $expected_error = ER_COMPRESSION_DICTIONARY_DOES_NOT_EXIST
 }
 
-if($alter_table_algorithm == 'INPLACE')
+if ($alter_table_algorithm == 'INPLACE')
 {
-  if($original_column_definition != $modified_column_definition)
+  if ($original_column_definition != $modified_column_definition)
   {
     --let $expected_error = ER_ALTER_OPERATION_NOT_SUPPORTED_REASON
   }
@@ -34,13 +34,13 @@ if($alter_table_algorithm == 'INPLACE')
 let $alter_table_statement = ALTER TABLE $original_table_name
   CHANGE COLUMN $original_column_name $modified_column_name $modified_column_definition,
   ALGORITHM = $alter_table_algorithm;
-if($expected_error)
+if ($expected_error)
 {
   --echo error is expected
   --error $expected_error
   --eval $alter_table_statement
 }
-if(!$expected_error)
+if (!$expected_error)
 {
   --echo successful execution is expected
   --eval $alter_table_statement
@@ -49,7 +49,7 @@ if(!$expected_error)
 
 # here, if error occurs, we make xtradb_compressed_columns_alter_table_post.inc
 # think that table hasn't been changed by reassigning control variables
-if($expected_error)
+if ($expected_error)
 {
   --let $saved_modified_column_name       = $modified_column_name
   --let $saved_modified_column_type       = $modified_column_type
@@ -66,7 +66,7 @@ if($expected_error)
 
 --source suite/innodb/include/xtradb_compressed_columns_alter_table_post.inc
 
-if($expected_error)
+if ($expected_error)
 {
   --let $modified_column_name       = $saved_modified_column_name
   --let $modified_column_type       = $saved_modified_column_type

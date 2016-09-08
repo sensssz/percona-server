@@ -131,7 +131,7 @@ eval ALTER TABLE $original_table_name RENAME TO $modified_table_name,
 --let $modified_column_name = $local_modified_column_name
 
 
-if($alter_table_algorithm != 'INPLACE')
+if ($alter_table_algorithm != 'INPLACE')
 {
   --echo # change storage engine for a table without compressed columns
   --let $original_dict_name =

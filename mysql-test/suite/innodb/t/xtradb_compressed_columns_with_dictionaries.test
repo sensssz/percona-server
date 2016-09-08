@@ -2,7 +2,7 @@
 
 # check if dictionary data supplied to "CREATE COMPRESSION_DICTIONARY ..."
 # statements is the same as in the information_schema (NUL characters
-# must not be ignored and must not be treaded as string terminators)
+# must not be ignored and must not be treated as string terminators)
 
 CREATE COMPRESSION_DICTIONARY d1('');
 CREATE COMPRESSION_DICTIONARY d2(_ucs2'');

@@ -1120,7 +1120,7 @@ static my_bool deny_updates_if_read_only_option(THD *thd,
     (lex->sql_command == SQLCOM_CREATE_DB) ||
     (lex->sql_command == SQLCOM_DROP_DB);
 
-  const bool create_or_drop_compression_dictionary =
+  const bool create_or_drop_compression_dictionary=
     (lex->sql_command == SQLCOM_CREATE_COMPRESSION_DICTIONARY) ||
     (lex->sql_command == SQLCOM_DROP_COMPRESSION_DICTIONARY);
 
@@ -4328,21 +4328,21 @@ end_with_restore_list:
     if (lex->default_value->fixed == 0)
       lex->default_value->fix_fields(thd, 0);
     String dict_data;
-    String* dict_data_ptr = lex->default_value->val_str_ascii(&dict_data);
+    String* dict_data_ptr= lex->default_value->val_str_ascii(&dict_data);
     if (dict_data_ptr == 0 || dict_data_ptr->ptr() == 0)
     {
       dict_data.set("", 0, &my_charset_bin);
-      dict_data_ptr = &dict_data;
+      dict_data_ptr= &dict_data;
     }
 
-    if ((res = mysql_create_zip_dict(thd, lex->ident.str, lex->ident.length,
+    if ((res= mysql_create_zip_dict(thd, lex->ident.str, lex->ident.length,
           dict_data_ptr->ptr(), dict_data_ptr->length())) == 0)
       my_ok(thd);
     break;
   }
   case SQLCOM_DROP_COMPRESSION_DICTIONARY:
   {
-    if ((res = mysql_drop_zip_dict(thd, lex->ident.str, lex->ident.length)) == 0)
+    if ((res= mysql_drop_zip_dict(thd, lex->ident.str, lex->ident.length)) == 0)
       my_ok(thd);
     break;
   }

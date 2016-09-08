@@ -1411,6 +1411,16 @@ bool Field::send_binary(Protocol *protocol)
   return protocol->store(tmp.ptr(), tmp.length(), tmp.charset());
 }
 
+/**
+  Checks if the current field definition and provided create field
+  definition have different compression attributes.
+
+  @param   new_field   create field definition to compare with
+
+  @return
+    true  - if compression attributes are different
+    false - if compression attributes are identical.
+*/
 bool Field::has_different_compression_attributes_with(const Create_field* new_field) const
 {
   return
@@ -1896,7 +1906,7 @@ Field *Field::new_field(MEM_ROOT *root, TABLE *new_table,
     (tmp->column_format() == COLUMN_FORMAT_TYPE_COMPRESSED);
   tmp->flags&= (NOT_NULL_FLAG | BLOB_FLAG | UNSIGNED_FLAG |
                 ZEROFILL_FLAG | BINARY_FLAG | ENUM_FLAG | SET_FLAG);
-  if(has_compressed_flag)
+  if (has_compressed_flag)
     tmp->set_column_format(COLUMN_FORMAT_TYPE_COMPRESSED);
   tmp->reset_fields();
   return tmp;
@@ -10105,7 +10115,8 @@ bool Create_field::init(THD *thd, const char *fld_name,
     my_error(ER_WRONG_FIELD_SPEC, MYF(0), fld_name);
     DBUG_RETURN(TRUE);
   }
-  zip_dict_name = *fld_zip_dict_name;
+
+  zip_dict_name= *fld_zip_dict_name;
   DBUG_RETURN(FALSE); /* success */
 }
 

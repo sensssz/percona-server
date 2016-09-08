@@ -451,15 +451,15 @@ void TABLE_SHARE::destroy()
   DBUG_ENTER("TABLE_SHARE::destroy");
   DBUG_PRINT("info", ("db: %s table: %s", db.str, table_name.str));
   Field* current_field;
-  for (uint i = 0; i < fields; ++i)
+  for (uint i= 0; i < fields; ++i)
   {
-    current_field = field[i];
+    current_field= field[i];
     if (current_field->has_associated_compression_dictionary())
     {
       my_free(const_cast<char*>(current_field->zip_dict_data.str));
-      current_field->zip_dict_data = null_lex_cstr;
+      current_field->zip_dict_data= null_lex_cstr;
       my_free(const_cast<char*>(current_field->zip_dict_name.str));
-      current_field->zip_dict_name = null_lex_cstr;
+      current_field->zip_dict_name= null_lex_cstr;
     }
   }
 
@@ -500,12 +500,16 @@ void TABLE_SHARE::destroy()
   DBUG_VOID_RETURN;
 }
 
+/**
+  Checks if TABLE_SHARE has at least one field with
+  COLUMN_FORMAT_TYPE_COMPRESSED flag.
+*/
 bool TABLE_SHARE::has_compressed_columns() const
 {
   DBUG_ENTER("has_compressed_columns");
   DBUG_ASSERT(field != 0);
 
-  Field **field_ptr = field;
+  Field **field_ptr= field;
   while(*field_ptr != 0 && (*field_ptr)->column_format() != COLUMN_FORMAT_TYPE_COMPRESSED)
     ++field_ptr;
 
@@ -1830,7 +1834,7 @@ static int open_binary_frm(THD *thd, TABLE_SHARE *share, uchar *head,
   }
   *field_ptr=0;					// End marker
   /* update zip dict info (name + data) from the handler */
-  if(share->has_compressed_columns())
+  if (share->has_compressed_columns())
     handler_file->update_field_defs_with_zip_dict_info();
 
   /* Fix key->name and key_part->field */
@@ -6478,12 +6482,16 @@ bool TABLE::check_read_removal(uint index)
   DBUG_RETURN(file->start_read_removal());
 }
 
+/**
+  Checks if TABLE has at least one field with
+  COLUMN_FORMAT_TYPE_COMPRESSED flag.
+*/
 bool TABLE::has_compressed_columns() const
 {
   DBUG_ENTER("has_compressed_columns");
   DBUG_ASSERT(field != 0);
 
-  Field **field_ptr = field;
+  Field **field_ptr= field;
   while(*field_ptr != 0 &&
         (*field_ptr)->column_format() != COLUMN_FORMAT_TYPE_COMPRESSED)
     ++field_ptr;
@@ -6491,38 +6499,42 @@ bool TABLE::has_compressed_columns() const
   DBUG_RETURN(*field_ptr != 0);
 }
 
+/**
+  Checks if TABLE has at least one field with
+  COLUMN_FORMAT_TYPE_COMPRESSED flag and non-empty
+  zip_dict.
+*/
 bool TABLE::has_compressed_columns_with_dictionaries() const
 {
   DBUG_ENTER("has_compressed_columns_with_dictionaries");
   DBUG_ASSERT(field != 0);
 
-  Field **field_ptr = field;
+  Field **field_ptr= field;
   while(*field_ptr != 0 && !(*field_ptr)->has_associated_compression_dictionary())
     ++field_ptr;
 
   DBUG_RETURN(*field_ptr != 0);
 }
 
+/**
+  Updates zip_dict_name in the TABLE's field definitions based on the
+  values from the supplied list of Create_field objects.
+*/
 void TABLE::update_compressed_columns_info(const List<Create_field>& fields)
 {
-  /*
-  Updating field definitions with zip_dict_name values
-  from the provided 'fields'
-  */
-  Field **field_ptr = field;
+  Field **field_ptr= field;
   List_iterator<Create_field> it(const_cast<List<Create_field>&>(fields));
-  Create_field *field_definition = it++;
+  Create_field *field_definition= it++;
 
   while (*field_ptr != 0 && field_definition != 0)
   {
-    (*field_ptr)->zip_dict_name = field_definition->zip_dict_name;
+    (*field_ptr)->zip_dict_name= field_definition->zip_dict_name;
     ++field_ptr;
-    field_definition = it++;
+    field_definition= it++;
   }
   DBUG_ASSERT(field_definition == 0);
   DBUG_ASSERT(*field_ptr == 0);
 }
-
 
 /**
   Test if the order list consists of simple field expressions

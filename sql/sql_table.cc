@@ -5805,7 +5805,7 @@ int mysql_discard_or_import_tablespace(THD *thd,
     with compressed columns.
   */
   if (table_list->table->has_compressed_columns())
-    error = HA_ERR_WRONG_COMMAND;
+    error= HA_ERR_WRONG_COMMAND;
   else
     error= table_list->table->file->ha_discard_or_import_tablespace(discard);
 
@@ -9954,11 +9954,11 @@ static bool check_engine(THD *thd, const char *db_name,
   */
   List_iterator<Create_field> it(
     const_cast<List<Create_field>&>(alter_info->create_list));
-  Create_field* sql_field = it++;
+  Create_field* sql_field= it++;
   while (sql_field != 0 &&
          sql_field->column_format() != COLUMN_FORMAT_TYPE_COMPRESSED)
-    sql_field = it++;
-  if(sql_field != 0 &&
+    sql_field= it++;
+  if (sql_field != 0 &&
     ((*new_engine)->create_zip_dict == 0 || (*new_engine)->drop_zip_dict == 0))
   {
     my_error(ER_ILLEGAL_HA_CREATE_OPTION, MYF(0),

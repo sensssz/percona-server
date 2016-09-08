@@ -172,21 +172,21 @@ eval INSERT INTO $compressed_table_name VALUES(0, @json_value);
 eval INSERT INTO $dictionary_compressed_table_name VALUES(0, @json_value);
 
 --let $i=$number_of_steps
-while($i)
+while ($i)
 {
   eval INSERT INTO $uncompressed_table_name SELECT * FROM $uncompressed_table_name;
   --dec $i
 }
 
 --let $i=$number_of_steps
-while($i)
+while ($i)
 {
   eval INSERT INTO $compressed_table_name SELECT * FROM $compressed_table_name;
   --dec $i
 }
 
 --let $i=$number_of_steps
-while($i)
+while ($i)
 {
   eval INSERT INTO $dictionary_compressed_table_name SELECT * FROM $dictionary_compressed_table_name;
   --dec $i

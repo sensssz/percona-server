@@ -907,6 +907,11 @@ public:
     if (real_maybe_null())
       null_ptr[row_offset]|= null_bit;
   }
+
+  /**
+    Checks if the field has COLUMN_FORMAT_TYPE_COMPRESSED flag and non-empty
+    associated xompression dictionary.
+  */
   bool has_associated_compression_dictionary() const
   {
     DBUG_ASSERT(zip_dict_name.str == 0 ||
@@ -1228,12 +1233,30 @@ public:
     flags |= (storage_type_arg << FIELD_FLAGS_STORAGE_MEDIA);
   }
 
+  /**
+    Returns column format type.
+
+    @return COLUMN_FORMAT_TYPE_DEFAULT,
+            COLUMN_FORMAT_TYPE_FIXED,
+            COLUMN_FORMAT_TYPE_DYNAMIC,
+            or
+            COLUMN_FORMAT_TYPE_COMPRESSED
+  */
   column_format_type column_format() const
   {
     return (column_format_type)
       ((flags >> FIELD_FLAGS_COLUMN_FORMAT) & 3);
   }
 
+  /**
+    Sets column format type to a new value.
+
+    @param   column_format_arg   COLUMN_FORMAT_TYPE_DEFAULT,
+                                 COLUMN_FORMAT_TYPE_FIXED,
+                                 COLUMN_FORMAT_TYPE_DYNAMIC,
+                                 or
+                                 COLUMN_FORMAT_TYPE_COMPRESSED
+  */
   void set_column_format(column_format_type column_format_arg)
   {
     DBUG_ASSERT(column_format() == COLUMN_FORMAT_TYPE_DEFAULT);
@@ -1439,6 +1462,16 @@ protected:
     return from + sizeof(int64);
   }
 
+  /**
+    Checks if the current field definition and provided create field
+    definition have different compression attributes.
+
+    @param   new_field   create field definition to compare with
+
+    @return
+      true  - if compression attributes are different
+      false - if compression attributes are identical.
+  */
   bool has_different_compression_attributes_with(const Create_field* new_field) const;
 };
 
@@ -3856,8 +3889,8 @@ public:
 
   void set_column_format(column_format_type column_format_arg)
   {
-    flags &= ~(FIELD_FLAGS_COLUMN_FORMAT_MASK);
-    flags |= (column_format_arg << FIELD_FLAGS_COLUMN_FORMAT);
+    flags&= ~(FIELD_FLAGS_COLUMN_FORMAT_MASK);
+    flags|= (column_format_arg << FIELD_FLAGS_COLUMN_FORMAT);
   }
 };
 

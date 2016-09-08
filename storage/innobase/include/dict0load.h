@@ -388,14 +388,13 @@ dict_process_sys_datafiles(
 	const rec_t*	rec,		/*!< in: current SYS_DATAFILES rec */
 	ulint*		space,		/*!< out: pace id */
 	const char**	path);		/*!< out: datafile path */
-/********************************************************************//**
-This function parses a SYS_ZIP_DICT record, extracts necessary
+
+/** This function parses a SYS_ZIP_DICT record, extracts necessary
 information from the record and returns to caller.
 @return error message, or NULL on success */
 UNIV_INTERN
 const char*
 dict_process_sys_zip_dict(
-/*=========================*/
 	mem_heap_t*	heap,		/*!< in/out: heap memory */
 	ulint		zip_size,	/*!< in: nonzero=compressed BLOB page size */
 	const rec_t*	rec,		/*!< in: current SYS_ZIP_DICT rec */
@@ -403,19 +402,19 @@ dict_process_sys_zip_dict(
 	const char**	name,		/*!< out: dict name */
 	const char**	data,		/*!< out: dict data */
 	ulint*		data_len);	/*!< out: dict data length */
-/********************************************************************//**
-This function parses a SYS_ZIP_DICT_COLS record, extracts necessary
+
+/** This function parses a SYS_ZIP_DICT_COLS record, extracts necessary
 information from the record and returns to caller.
 @return error message, or NULL on success */
 UNIV_INTERN
 const char*
 dict_process_sys_zip_dict_cols(
-/*=========================*/
 	mem_heap_t*	heap,		/*!< in/out: heap memory */
 	const rec_t*	rec,		/*!< in: current SYS_ZIP_DICT rec */
 	ulint*		table_id,	/*!< out: table id */
 	ulint*		column_pos,	/*!< out: column position */
 	ulint*		dict_id);	/*!< out: dict id */
+
 /********************************************************************//**
 Get the filepath for a spaceid from SYS_DATAFILES. This function provides
 a temporary heap which is used for the table lookup, but not for the path.

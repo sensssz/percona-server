@@ -7118,7 +7118,7 @@ ER_CANT_EXECUTE_WITH_BACKUP_LOCK
 	rus "Запрос не может быть выполнен из-за конфликтующей блокировки резервного копирования"
 
 ER_COMPRESSED_COLUMN_USED_AS_KEY
-  eng "Compressed BLOB/TEXT/VARCHAR/VARBINARY column '%-.192s' used in key list is not allowed"
+  eng "Compressed column '%-.192s' is not allowed in the key list"
 
 ER_UNSUPPORTED_COMPRESSED_COLUMN_TYPE
   eng "Can not define column '%-.192s' in compressed format"

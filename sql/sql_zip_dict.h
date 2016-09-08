@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2010-2016, Percona Inc. All Rights Reserved.
+Copyright (c) 2016, Percona Inc. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -23,44 +23,42 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 class THD;
 
-  /**
-    Creates a new compression dictionary with the specified data.
+/**
+  Creates a new compression dictionary with the specified data.
 
-    @param thd                        thread descriptor.
-    @param name                       compression dictionary name
-    @param name_len                   compression dictionary name length
-    @param data                       compression dictionary data
-    @param data_len                   compression dictionary data length
+  @param thd                        thread descriptor.
+  @param name                       compression dictionary name
+  @param name_len                   compression dictionary name length
+  @param data                       compression dictionary data
+  @param data_len                   compression dictionary data length
 
-    @return HA_CREATE_ZIP_DICT_OK             - on success
-            HA_CREATE_ZIP_DICT_ALREADY_EXISTS - if dictionary with such name
-                                                already exists
-            HA_CREATE_ZIP_DICT_NAME_TOO_LONG  - if dictionary name is too long
-            HA_CREATE_ZIP_DICT_DATA_TOO_LONG  - if dictionary data is too long
-            HA_CREATE_ZIP_DICT_UNKNOWN_ERROR  - if unexpected error occurred
-            HA_ADMIN_NOT_IMPLEMENTED          - if current engine does not
-                                                support compression
-                                                dictionaries
-  */
+  @return Completion status
+    @retval 0                                       Success
+    @retval ER_ILLEGAL_HA_CREATE_OPTION             SE does not support compression dictionaries
+    @retval ER_COMPRESSION_DICTIONARY_NAME_TOO_LONG Dictionary name is too long
+    @retval ER_COMPRESSION_DICTIONARY_DATA_TOO_LONG Dictionary data is too long
+    @retval ER_COMPRESSION_DICTIONARY_EXISTS        Dictionary with such name already exists
+    @retval ER_READ_ONLY_MODE                       Forbidden in read-only mode
+    @retval ER_UNKNOWN_ERROR                        Unknown error
+*/
 int mysql_create_zip_dict(THD* thd, const char* name, ulong name_len,
   const char* data, ulong data_len);
 
-  /**
-    Deletes a compression dictionary.
+/**
+  Deletes a compression dictionary.
 
-    @param thd                        thread descriptor.
-    @param name                       compression dictionary name
-    @param name_len                   compression dictionary name length
+  @param thd                        thread descriptor.
+  @param name                       compression dictionary name
+  @param name_len                   compression dictionary name length
 
-    @return HA_DROP_ZIP_DICT_OK,            - on success
-            HA_DROP_ZIP_DICT_DOES_NOT_EXIST - if dictionary with such name does
-                                              not exist
-            HA_DROP_ZIP_DICT_IS_REFERENCED, - if dictictionary is still in use
-            HA_DROP_ZIP_DICT_UNKNOWN_ERROR  - if unexpected error occurred
-            HA_ADMIN_NOT_IMPLEMENTED          - if current engine does not
-                                                support compression
-                                                dictionaries
-  */
+  @return Completion status
+    @retval 0                                        Success
+    @retval ER_ILLEGAL_HA_CREATE_OPTION              SE does not support compression dictionaries
+    @retval ER_COMPRESSION_DICTIONARY_DOES_NOT_EXIST Dictionary with such name does not exist
+    @retval ER_COMPRESSION_DICTIONARY_IS_REFERENCED  Dictictionary is still in use
+    @retval ER_READ_ONLY_MODE                        Forbidden in read-only mode
+    @retval ER_UNKNOWN_ERROR                         Unknown error
+*/
 int mysql_drop_zip_dict(THD* thd, const char* name, ulong name_len);
 
 #endif /* SQL_ZIP_DICT_INCLUDED */

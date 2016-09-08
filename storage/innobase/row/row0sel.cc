@@ -2570,24 +2570,24 @@ static MY_ATTRIBUTE((nonnull))
 void
 row_sel_field_store_in_mysql_format_func(
 /*=====================================*/
-	byte*		dest,		/*!< in/out: buffer where to store; NOTE
-					that BLOBs are not in themselves
-					stored here: the caller must allocate
-					and copy the BLOB into buffer before,
-					and pass the pointer to the BLOB in
-					'data' */
+	byte*		dest,	/*!< in/out: buffer where to store; NOTE
+				that BLOBs are not in themselves
+				stored here: the caller must allocate
+				and copy the BLOB into buffer before,
+				and pass the pointer to the BLOB in
+				'data' */
 	const mysql_row_templ_t* templ,
-					/*!< in: MySQL column template.
-					Its following fields are referenced:
-					type, is_unsigned, mysql_col_len,
-					mbminlen, mbmaxlen */
+				/*!< in: MySQL column template.
+				Its following fields are referenced:
+				type, is_unsigned, mysql_col_len,
+				mbminlen, mbmaxlen */
 #ifdef UNIV_DEBUG
 	const dict_index_t* index,
-					/*!< in: InnoDB index */
+				/*!< in: InnoDB index */
 	ulint		field_no,
-					/*!< in: templ->rec_field_no or
-					templ->clust_rec_field_no or
-					templ->icp_rec_field_no */
+				/*!< in: templ->rec_field_no or
+				templ->clust_rec_field_no or
+				templ->icp_rec_field_no */
 #endif /* UNIV_DEBUG */
 	const byte*	data,		/*!< in: data to store */
 	ulint		len,		/*!< in: length of the data */
@@ -2637,7 +2637,7 @@ row_sel_field_store_in_mysql_format_func(
 		if (templ->mysql_type == DATA_MYSQL_TRUE_VARCHAR) {
 			/* If this is a compressed column, decompress it first*/
 			if (templ->compressed)
-				data = row_decompress_column(data, &len,
+				data= row_decompress_column(data, &len,
 					reinterpret_cast<const byte*>(
 						templ->zip_dict_data.str),
 					templ->zip_dict_data.length, prebuilt);

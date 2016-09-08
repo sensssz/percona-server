@@ -410,9 +410,9 @@ enum row_type { ROW_TYPE_NOT_USED=-1, ROW_TYPE_DEFAULT, ROW_TYPE_FIXED,
 
 /* Specifies data storage format for individual columns */
 enum column_format_type {
-  COLUMN_FORMAT_TYPE_DEFAULT=    0, /* Not specified (use engine default) */
-  COLUMN_FORMAT_TYPE_FIXED=      1, /* FIXED format */
-  COLUMN_FORMAT_TYPE_DYNAMIC=    2, /* DYNAMIC format */
+  COLUMN_FORMAT_TYPE_DEFAULT=   0, /* Not specified (use engine default) */
+  COLUMN_FORMAT_TYPE_FIXED=     1, /* FIXED format */
+  COLUMN_FORMAT_TYPE_DYNAMIC=   2, /* DYNAMIC format */
   COLUMN_FORMAT_TYPE_COMPRESSED= 3  /* COMPRESSED format*/
 };
 
@@ -801,23 +801,25 @@ struct handler_iterator {
   void *buffer;
 };
 
+/** Create compression dictionary result type. */
 enum handler_create_zip_dict_result
 {
-  HA_CREATE_ZIP_DICT_OK,             /* zip_dict successfully created */
-  HA_CREATE_ZIP_DICT_ALREADY_EXISTS, /* zip dict with such name already exists */
-  HA_CREATE_ZIP_DICT_NAME_TOO_LONG,  /* zip dict name is too long */
-  HA_CREATE_ZIP_DICT_DATA_TOO_LONG,  /* zip dict data is too long */
-  HA_CREATE_ZIP_DICT_READ_ONLY,      /* cannot create in read-only mode */
-  HA_CREATE_ZIP_DICT_UNKNOWN_ERROR   /* unknown error during zip_dict creation */
+  HA_CREATE_ZIP_DICT_OK,             /*!< zip_dict successfully created */
+  HA_CREATE_ZIP_DICT_ALREADY_EXISTS, /*!< zip dict with such name already exists */
+  HA_CREATE_ZIP_DICT_NAME_TOO_LONG,  /*!< zip dict name is too long */
+  HA_CREATE_ZIP_DICT_DATA_TOO_LONG,  /*!< zip dict data is too long */
+  HA_CREATE_ZIP_DICT_READ_ONLY,      /*!< cannot create in read-only mode */
+  HA_CREATE_ZIP_DICT_UNKNOWN_ERROR   /*!< unknown error during zip_dict creation */
 };
 
+/** Drop compression dictionary result type. */
 enum handler_drop_zip_dict_result
 {
-  HA_DROP_ZIP_DICT_OK,             /* zip_dict successfully dropped */
-  HA_DROP_ZIP_DICT_DOES_NOT_EXIST, /* zip dict with such name does not exist */
-  HA_DROP_ZIP_DICT_IS_REFERENCED,  /* zip dict is in use */
-  HA_DROP_ZIP_DICT_READ_ONLY,      /* cannot drop in read-only mode */
-  HA_DROP_ZIP_DICT_UNKNOWN_ERROR   /* unknown error during zip_dict removal */
+  HA_DROP_ZIP_DICT_OK,             /*!< zip_dict successfully dropped */
+  HA_DROP_ZIP_DICT_DOES_NOT_EXIST, /*!< zip dict with such name does not exist */
+  HA_DROP_ZIP_DICT_IS_REFERENCED,  /*!< zip dict is in use */
+  HA_DROP_ZIP_DICT_READ_ONLY,      /*!< cannot drop in read-only mode */
+  HA_DROP_ZIP_DICT_UNKNOWN_ERROR   /*!< unknown error during zip_dict removal */
 };
 
 class handler;
@@ -1024,12 +1026,7 @@ struct handlerton
     @param data                       compression dictionary data
     @param data_len                   compression dictionary data length
 
-    @return HA_CREATE_ZIP_DICT_OK             - on success
-            HA_CREATE_ZIP_DICT_ALREADY_EXISTS - if dictionary with such name
-                                                already exists
-            HA_CREATE_ZIP_DICT_NAME_TOO_LONG  - if dictionary name is too long
-            HA_CREATE_ZIP_DICT_DATA_TOO_LONG  - if dictionary data is too long
-            HA_CREATE_ZIP_DICT_UNKNOWN_ERROR  - if unexpected error occurred
+    @return a valid #handler_create_zip_dict_result value.
 
     This interface is optional, so not every SE needs to implement it.
   */
@@ -1043,11 +1040,7 @@ struct handlerton
     @param name                       compression dictionary name
     @param name_len                   compression dictionary name length
 
-    @return HA_DROP_ZIP_DICT_OK,            - on success
-            HA_DROP_ZIP_DICT_DOES_NOT_EXIST - if dictionary with such name does
-                                              not exist
-            HA_DROP_ZIP_DICT_IS_REFERENCED, - if dictictionary is still in use
-            HA_DROP_ZIP_DICT_UNKNOWN_ERROR  - if unexpected error occurred
+    @return a valid #handler_drop_zip_dict_result value.
 
     This interface is optional, so not every SE needs to implement it.
   */
@@ -3590,7 +3583,7 @@ class Create_field;
 int ha_create_table(THD *thd, const char *path,
                     const char *db, const char *table_name,
                     HA_CREATE_INFO *create_info,
-                    List<Create_field> *create_fields,
+                    const List<Create_field> *create_fields,
                     bool update_create_info,
                     bool is_temp_table= false);
 

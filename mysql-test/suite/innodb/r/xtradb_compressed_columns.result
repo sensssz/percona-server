@@ -49,10 +49,10 @@ t9	CREATE TABLE `t9` (
   `a` varchar(1000) /*!50632 COLUMN_FORMAT COMPRESSED */ DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1
 CREATE TABLE t1(a BLOB COLUMN_FORMAT COMPRESSED, KEY(a(10)));
-ERROR HY000: Compressed BLOB/TEXT/VARCHAR/VARBINARY column 'a' used in key list is not allowed
+ERROR HY000: Compressed column 'a' is not allowed in the key list
 CREATE TABLE t1(a BLOB COLUMN_FORMAT COMPRESSED);
 ALTER TABLE t3 ADD KEY(a(10));
-ERROR HY000: Compressed BLOB/TEXT/VARCHAR/VARBINARY column 'a' used in key list is not allowed
+ERROR HY000: Compressed column 'a' is not allowed in the key list
 DROP TABLE t1;
 CREATE TABLE t1 (a BLOB) ENGINE=InnoDB;
 ALTER TABLE t1 ADD KEY(a(10));
