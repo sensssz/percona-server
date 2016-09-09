@@ -277,16 +277,67 @@ row_mysql_read_true_varchar(
 
 	return(field + 1);
 }
-#define COLUMN_COMPRESS_PREFIX_MAX_LEN	5
-#define COLUMN_COMPRESS_HEADER_LEN	1
-#define COLUMN_COMPRESS_FLAG_MASK	(0x80)
-#define COLUMN_COMPRESS_FLAG		7	/*flag to mark if the column is compressed , bit 8*/
-#define COLUMN_COMPRESS_DATA_LEN_MASK	(0x60)
-#define COLUMN_COMPRESS_DATA_LEN	5	/*store bytes used to express the column length, bit 7,6*/
-#define COLUMN_COMPRESS_ALG_MASK	(0x1C)
-#define COLUMN_COMPRESS_ALG		2	/*store compression algorithm, default 0, bit 5,4,3*/
-#define COLUMN_COMPRESS_WRAP_MASK	(0x02)
-#define COLUMN_COMPRESS_WRAP		1	/*identify if adler32 is calculated, bit 2*/
+
+/**
+  Compressed BLOB header format:
+  ---------------------------------------------------------------------------------
+  | reserved[1] | wrap[1] | algorithm[5] | len-len[3] | compressed[1] | unused[5] |
+  ---------------------------------------------------------------------------------
+  | 0         0 | 1     1 | 2          6 | 7        9 | 10         10 | 11     15 |
+  ---------------------------------------------------------------------------------
+  * 'reserved' bit is planned to be used in future versions of the BLOB header. In
+  this version it must always be 'default_zip_column_reserved_value' (0).
+  * 'wrap' identifies if compression algorithm calculated a checksum (adler32 in
+  case of zlib) and appended it to the compressed data.
+  * 'algorithm' identifies which algoritm was used to compress this BLOB. Currently,
+  the only value 'default_zip_column_algorithm_value' (0) is supported.
+  * 'len-len' field identifies the length of the column length data portion followed
+  by this header (see below).
+  * If 'compressed' bit is set to 1, then this header is immediately followed
+  by 1..8 bytes (depending on the value of 'len-len' bitfield) which determine
+  original (uncompressed) block size. These 'len-len' bytes are followed by
+  compressed representation of the original data.
+  * If 'compressed' bit is set to 0, every other bitfield ('wrap', 'algorithm' and
+  'le-len') can be ignored. In this case the header is immediately followed by
+  uncompressed (original) data.
+*/
+
+/** Currently the only supported value for the 'reserved' field is false (0).*/
+static const bool default_zip_column_reserved_value= false;
+
+/**
+  Currently the only supported value for the 'algorithm' field is 0, which
+  means 'zlib'.
+*/
+static const uint default_zip_column_algorithm_value= 0;
+
+static const size_t zip_column_prefix_max_length= 10;
+static const size_t zip_column_header_length= 2;
+
+/* 'reserved', bit 0 */
+static const uint zip_column_reserved= 0;
+/* 0000 0000 0000 0001 */
+static const uint zip_column_reserved_mask= 0x0001;
+
+/* 'wrap', bit 1 */
+static const uint zip_column_wrap= 1;
+/* 0000 0000 0000 0010 */
+static const uint zip_column_wrap_mask= 0x0002;
+
+/* 'algorithm', bit 2,3,4,5,6 */
+static const uint zip_column_algorithm= 2;
+/* 0000 0000 0111 1100 */
+static const uint zip_column_algorithm_mask= 0x007C;
+
+/* 'len-len', bit 7,8,9 */
+static const uint zip_column_data_length= 7;
+/* 0000 0011 1000 0000 */
+static const uint zip_column_data_length_mask= 0x0380;
+
+/* 'compressed', bit 10 */
+static const uint zip_column_compressed= 10;
+/* 0000 0100 0000 0000 */
+static const uint zip_column_compressed_mask= 0x0400;
 
 /** Updates compressed block header with the given components */
 static void
@@ -295,13 +346,17 @@ column_set_compress_header(
 	bool	compressed,
 	ulint	lenlen,
 	uint	alg,
-	bool	wrap)
+	bool	wrap,
+	bool	reserved)
 {
-	data[0]= 0x00;
-	data[0]|= (compressed << COLUMN_COMPRESS_FLAG);
-	data[0]|= (lenlen << COLUMN_COMPRESS_DATA_LEN);
-	data[0]|= (alg << COLUMN_COMPRESS_ALG);
-	data[0]|= (wrap << COLUMN_COMPRESS_WRAP);
+	ulint header= 0;
+	header= 0x00;
+	header|= (compressed << zip_column_compressed);
+	header|= (lenlen << zip_column_data_length);
+	header|= (alg << zip_column_algorithm);
+	header|= (wrap << zip_column_wrap);
+	header|= (reserved << zip_column_reserved);
+	mach_write_to_2(data, header);
 }
 
 /** Parse compressed block header into components */
@@ -311,12 +366,16 @@ column_get_compress_header(
 	bool*		compressed,
 	ulint*		lenlen,
 	uint*		alg,
-	bool*		wrap)
+	bool*		wrap,
+	bool*		reserved
+)
 {
-	*compressed= ((data[0] & COLUMN_COMPRESS_FLAG_MASK) >> COLUMN_COMPRESS_FLAG);
-	*lenlen= ((data[0] & COLUMN_COMPRESS_DATA_LEN_MASK) >> COLUMN_COMPRESS_DATA_LEN);
-	*alg= ((data[0] & COLUMN_COMPRESS_ALG_MASK) >> COLUMN_COMPRESS_ALG);
-	*wrap= ((data[0] & COLUMN_COMPRESS_WRAP_MASK) >> COLUMN_COMPRESS_WRAP);
+	ulint header= mach_read_from_2(data);
+	*compressed= ((header & zip_column_compressed_mask) >> zip_column_compressed);
+	*lenlen= ((header & zip_column_data_length_mask) >> zip_column_data_length);
+	*alg= ((header & zip_column_algorithm_mask) >> zip_column_algorithm);
+	*wrap= ((header & zip_column_wrap_mask) >> zip_column_wrap);
+	*reserved= ((header & zip_column_reserved_mask) >> zip_column_reserved);
 }
 
 /** Allocate memory for zlib. */
@@ -372,7 +431,7 @@ row_compress_column(
 {
 	int err= 0;
 	ulint comp_len= *len;
-	ulint buf_len= *len + COLUMN_COMPRESS_PREFIX_MAX_LEN;
+	ulint buf_len= *len + zip_column_prefix_max_length;
 	byte* buf;
 	byte* ptr;
 	z_stream c_stream;
@@ -392,7 +451,7 @@ row_compress_column(
 		srv_compressed_columns_zip_level == Z_NO_COMPRESSION)
 		goto do_not_compress;
 
-	ptr= buf + COLUMN_COMPRESS_HEADER_LEN + lenlen;
+	ptr= buf + zip_column_header_length + lenlen;
 
 	/*init deflate object*/
 	c_stream.next_in= const_cast<Bytef*>(data);
@@ -403,7 +462,7 @@ row_compress_column(
 	column_zip_set_alloc(&c_stream, prebuilt->compress_heap);
 
 	err= deflateInit2(&c_stream, srv_compressed_columns_zip_level,
-			Z_DEFLATED, window_bits, MAX_MEM_LEVEL, srv_compressed_columns_zlib_strategy);
+		Z_DEFLATED, window_bits, MAX_MEM_LEVEL, srv_compressed_columns_zlib_strategy);
 	ut_a(err == Z_OK);
 
 	if (dict_data != 0 && dict_data_len != 0)
@@ -433,10 +492,12 @@ row_compress_column(
 	}
 
 	/* make sure the compressed data size is smaller than uncmpressed data*/
-	if (err == Z_OK && *len > (comp_len + COLUMN_COMPRESS_HEADER_LEN + lenlen))
+	if (err == Z_OK && *len > (comp_len + zip_column_header_length + lenlen))
 	{
-		column_set_compress_header(buf, 1, lenlen - 1, 0, wrap);
-		ptr= buf + 1;
+		column_set_compress_header(buf, true, lenlen - 1,
+			default_zip_column_algorithm_value, wrap,
+			default_zip_column_reserved_value);
+		ptr= buf + zip_column_header_length;
 		/*store the uncompressed data length*/
 		switch (lenlen) {
 		case 1:
@@ -452,19 +513,21 @@ row_compress_column(
 			mach_write_to_4(ptr, *len);
 			break;
 		default:
-			ut_a(0);
+			ut_error;
 		}
 
-		*len= comp_len + COLUMN_COMPRESS_HEADER_LEN + lenlen;
+		*len= comp_len + zip_column_header_length + lenlen;
 		return buf;
 	}
 
 do_not_compress:
 	ptr= buf;
-	column_set_compress_header(ptr, 0, 0, 0, 0);
-	ptr+= COLUMN_COMPRESS_HEADER_LEN;
+	column_set_compress_header(ptr, false, 0,
+		default_zip_column_algorithm_value, false,
+		default_zip_column_reserved_value);
+	ptr+= zip_column_header_length;
 	memcpy(ptr, data, *len);
-	*len+= COLUMN_COMPRESS_HEADER_LEN;
+	*len+= zip_column_header_length;
 	return buf;
 }
 
@@ -485,27 +548,35 @@ row_decompress_column(
 	z_stream d_stream;
 	bool is_compressed= false;
 	bool wrap= false;
+	bool reserved= false;
 	ulint lenlen= 0;
 	uint alg= 0;
 
-	column_get_compress_header(data, &is_compressed, &lenlen, &alg, &wrap);
+	column_get_compress_header(data, &is_compressed, &lenlen, &alg, &wrap,
+		&reserved);
 
-	if (alg != 0) {
-		ib_logf(IB_LOG_LEVEL_ERROR, "unsupported 'algorithm' value in the compressed BLOB header\n");
+	if (reserved != default_zip_column_reserved_value) {
+		ib_logf(IB_LOG_LEVEL_ERROR, "unsupported compressed BLOB header format\n");
+		ut_error;
+	}
+
+	if (alg != default_zip_column_algorithm_value) {
+		ib_logf(IB_LOG_LEVEL_ERROR,
+			"unsupported 'algorithm' value in the compressed BLOB header\n");
 		ut_error;
 	}
 
 	ut_a(lenlen < 4);
 
-	data+= COLUMN_COMPRESS_HEADER_LEN;
+	data+= zip_column_header_length;
 	if (!is_compressed) { /* column not compressed */
-		*len-= COLUMN_COMPRESS_HEADER_LEN;
+		*len-= zip_column_header_length;
 		return data;
 	}
 
 	lenlen++;
 
-	ulint comp_len= *len - COLUMN_COMPRESS_HEADER_LEN - lenlen;
+	ulint comp_len= *len - zip_column_header_length - lenlen;
 
 	ulint uncomp_len= 0;
 	switch (lenlen) {
@@ -522,7 +593,7 @@ row_decompress_column(
 		uncomp_len= mach_read_from_4(data);
 		break;
 	default:
-		ut_a(0);
+		ut_error;
 	}
 
 	data+= lenlen;
@@ -583,14 +654,14 @@ row_decompress_column(
 		if (buf_len != uncomp_len)
 		{
 			ib_logf(IB_LOG_LEVEL_ERROR, "failed to decompress blob column, may be corrupted\n");
-			ut_a(0);
+			ut_error;
 		}
 
 		return buf;
 	}
 
 	ib_logf(IB_LOG_LEVEL_ERROR, "failed to decompress column, this shouldn't happen!\n");
-	*len-= (COLUMN_COMPRESS_HEADER_LEN + lenlen);
+	*len-= (zip_column_header_length + lenlen);
 	return data;
 }
 
