@@ -3442,8 +3442,8 @@ innobase_init(
 
 	innobase_hton->kill_connection = innobase_kill_connection;
 
-	innobase_hton->create_zip_dict= innobase_create_zip_dict;
-	innobase_hton->drop_zip_dict= innobase_drop_zip_dict;
+	innobase_hton->create_zip_dict = innobase_create_zip_dict;
+	innobase_hton->drop_zip_dict = innobase_drop_zip_dict;
 
 	ut_a(DATA_MYSQL_TRUE_VARCHAR == (ulint)MYSQL_TYPE_VARCHAR);
 
@@ -4134,7 +4134,7 @@ innobase_create_zip_dict(
 	const char*	data,		/*!< in: zip dictionary data */
 	ulint*		data_len)	/*!< in/out: zip dictionary data length */
 {
-	handler_create_zip_dict_result result= HA_CREATE_ZIP_DICT_UNKNOWN_ERROR;
+	handler_create_zip_dict_result result = HA_CREATE_ZIP_DICT_UNKNOWN_ERROR;
 
 	DBUG_ENTER("innobase_create_zip_dict");
 	DBUG_ASSERT(hton == innodb_hton_ptr);
@@ -4145,27 +4145,27 @@ innobase_create_zip_dict(
 
 	if (UNIV_UNLIKELY(*name_len > ZIP_DICT_MAX_NAME_LENGTH))
 	{
-		*name_len= ZIP_DICT_MAX_NAME_LENGTH;
+		*name_len = ZIP_DICT_MAX_NAME_LENGTH;
 		DBUG_RETURN(HA_CREATE_ZIP_DICT_NAME_TOO_LONG);
 	}
 
 	if (UNIV_UNLIKELY(*data_len > ZIP_DICT_MAX_DATA_LENGTH))
 	{
-		*data_len= ZIP_DICT_MAX_DATA_LENGTH;
+		*data_len = ZIP_DICT_MAX_DATA_LENGTH;
 		DBUG_RETURN(HA_CREATE_ZIP_DICT_DATA_TOO_LONG);
 	}
 
 	switch (dict_create_zip_dict(name, *name_len, data, *data_len))
 	{
 		case DB_SUCCESS:
-			result= HA_CREATE_ZIP_DICT_OK;
+			result = HA_CREATE_ZIP_DICT_OK;
 			break;
 		case DB_DUPLICATE_KEY:
-			result= HA_CREATE_ZIP_DICT_ALREADY_EXISTS;
+			result = HA_CREATE_ZIP_DICT_ALREADY_EXISTS;
 			break;
 		default:
 			ut_ad(0);
-			result= HA_CREATE_ZIP_DICT_UNKNOWN_ERROR;
+			result = HA_CREATE_ZIP_DICT_UNKNOWN_ERROR;
 	}
 	DBUG_RETURN(result);
 }
@@ -4179,7 +4179,7 @@ innobase_drop_zip_dict(
 	const char*	name,		/*!< in: zip dictionary name */
 	ulint*		name_len)	/*!< in/out: zip dictionary name length */
 {
-	handler_drop_zip_dict_result result= HA_DROP_ZIP_DICT_UNKNOWN_ERROR;
+	handler_drop_zip_dict_result result = HA_DROP_ZIP_DICT_UNKNOWN_ERROR;
 
 	DBUG_ENTER("innobase_drop_zip_dict");
 	DBUG_ASSERT(hton == innodb_hton_ptr);
@@ -4191,17 +4191,17 @@ innobase_drop_zip_dict(
 	switch (dict_drop_zip_dict(name, *name_len))
 	{
 		case DB_SUCCESS:
-			result= HA_DROP_ZIP_DICT_OK;
+			result = HA_DROP_ZIP_DICT_OK;
 			break;
 		case DB_RECORD_NOT_FOUND:
-			result= HA_DROP_ZIP_DICT_DOES_NOT_EXIST;
+			result = HA_DROP_ZIP_DICT_DOES_NOT_EXIST;
 			break;
 		case DB_ROW_IS_REFERENCED:
-			result= HA_DROP_ZIP_DICT_IS_REFERENCED;
+			result = HA_DROP_ZIP_DICT_IS_REFERENCED;
 			break;
 		default:
 			ut_ad(0);
-			result= HA_DROP_ZIP_DICT_UNKNOWN_ERROR;
+			result = HA_DROP_ZIP_DICT_UNKNOWN_ERROR;
 	}
 	DBUG_RETURN(result);
 }
@@ -5583,14 +5583,14 @@ innobase_create_zip_dict_references(
 					zip_dict reference cannot be
 					created. */
 {
-	dberr_t res= DB_SUCCESS;
+	dberr_t res = DB_SUCCESS;
 	DBUG_ENTER("innobase_create_zip_dict_references");
-	Field** zip_field_ptr= table->field;
+	Field** zip_field_ptr = table->field;
 	while (res == DB_SUCCESS && *zip_field_ptr != 0)
 	{
 		if ((*zip_field_ptr)->has_associated_compression_dictionary())
 		{
-			res= dict_create_add_zip_dict_reference(ib_table_id,
+			res = dict_create_add_zip_dict_reference(ib_table_id,
 				(*zip_field_ptr)->field_index, (*zip_field_ptr)->zip_dict_name.str,
 				(*zip_field_ptr)->zip_dict_name.length, trx);
 		}
@@ -5598,15 +5598,15 @@ innobase_create_zip_dict_references(
 	}
 	if (res != DB_SUCCESS)
 	{
-		trx->error_state= DB_SUCCESS;
+		trx->error_state = DB_SUCCESS;
 		trx_rollback_to_savepoint(trx, NULL);
 		row_drop_table_for_mysql(table_name, trx, FALSE);
 		trx_commit_for_mysql(trx);
-		trx->error_state= DB_SUCCESS;
+		trx->error_state = DB_SUCCESS;
 		if (err_field != 0)
 		{
 			--zip_field_ptr;
-			*err_field= (*zip_field_ptr)->zip_dict_name.str;
+			*err_field = (*zip_field_ptr)->zip_dict_name.str;
 		}
 	}
 
@@ -7160,9 +7160,9 @@ build_template_field(
 	templ->mbminlen = dict_col_get_mbminlen(col);
 	templ->mbmaxlen = dict_col_get_mbmaxlen(col);
 	templ->is_unsigned = col->prtype & DATA_UNSIGNED;
-	templ->compressed= (field->column_format()
+	templ->compressed = (field->column_format()
 				== COLUMN_FORMAT_TYPE_COMPRESSED);
-	templ->zip_dict_data= field->zip_dict_data;
+	templ->zip_dict_data = field->zip_dict_data;
 
 	if (!dict_index_is_clust(index)
 	    && templ->rec_field_no == ULINT_UNDEFINED) {
@@ -7918,8 +7918,8 @@ calc_row_difference(
 
 		case DATA_BLOB:
 			/* Do not compress blob column while comparing*/
-			o_ptr= row_mysql_read_blob_ref(&o_len, o_ptr, o_len, false, 0, 0, prebuilt);
-			n_ptr= row_mysql_read_blob_ref(&n_len, n_ptr, n_len, false, 0, 0, prebuilt);
+			o_ptr = row_mysql_read_blob_ref(&o_len, o_ptr, o_len, false, 0, 0, prebuilt);
+			n_ptr = row_mysql_read_blob_ref(&n_len, n_ptr, n_len, false, 0, 0, prebuilt);
 
 			break;
 
@@ -10869,14 +10869,14 @@ ha_innobase::create(
 	*/
 	if (form->has_compressed_columns_with_dictionaries())
 	{
-		innobase_table= dict_table_open_on_name(
+		innobase_table = dict_table_open_on_name(
 			norm_name, TRUE, FALSE, DICT_ERR_IGNORE_NONE);
 
 		ut_a(innobase_table);
-		table_id_t table_id= innobase_table->id;
+		table_id_t table_id = innobase_table->id;
 		dict_table_close(innobase_table, TRUE, FALSE);
-		const char* err_zip_field_name= 0;
-		dberr_t zip_dict_err= innobase_create_zip_dict_references(form, norm_name,
+		const char* err_zip_field_name = 0;
+		dberr_t zip_dict_err = innobase_create_zip_dict_references(form, norm_name,
 			table_id, trx, &err_zip_field_name);
 		if (zip_dict_err != DB_SUCCESS) {
 			switch (zip_dict_err)
@@ -10888,7 +10888,7 @@ ha_innobase::create(
 				default:
 					my_error(ER_UNKNOWN_ERROR, MYF(0));
 			}
-			error= -1;
+			error = -1;
 			goto cleanup;
 		}
 	}
@@ -15221,7 +15221,7 @@ ha_innobase::update_field_defs_with_zip_dict_info()
 	char norm_name[FN_REFLEN];
 	normalize_table_name(norm_name, table_share->normalized_path.str);
 
-	dict_table_t* ib_table= dict_table_open_on_name(
+	dict_table_t* ib_table = dict_table_open_on_name(
 		norm_name, FALSE, FALSE, DICT_ERR_IGNORE_NONE);
 
 	/* if dict_table_open_on_name() returns NULL, then it means that
@@ -15230,33 +15230,33 @@ ha_innobase::update_field_defs_with_zip_dict_info()
 	if (ib_table == 0)
 		DBUG_VOID_RETURN;
 
-	table_id_t ib_table_id= ib_table->id;
+	table_id_t ib_table_id = ib_table->id;
 	dict_table_close(ib_table, FALSE, FALSE);
 	Field* field;
-	for (uint i= 0; i < table_share->fields; ++i)
+	for (uint i = 0; i < table_share->fields; ++i)
 	{
-		field= table_share->field[i];
+		field = table_share->field[i];
 		if (field->column_format() == COLUMN_FORMAT_TYPE_COMPRESSED)
 		{
-			bool reference_found= false;
-			ulint dict_id= 0;
+			bool reference_found = false;
+			ulint dict_id = 0;
 			switch (dict_get_dictionary_id_by_key(ib_table_id, i, &dict_id))
 			{
 				case DB_SUCCESS:
-					reference_found= true;
+					reference_found = true;
 					break;
 				case DB_RECORD_NOT_FOUND:
-					reference_found= false;
+					reference_found = false;
 					break;
 				default:
 					ut_error;
 			}
 			if (reference_found)
 			{
-				char* local_name= 0;
-				ulint local_name_len= 0;
-				char* local_data= 0;
-				ulint local_data_len= 0;
+				char* local_name = 0;
+				ulint local_name_len = 0;
+				char* local_data = 0;
+				ulint local_data_len = 0;
 				if (dict_get_dictionary_info_by_id(dict_id, &local_name, &local_name_len,
 					&local_data, &local_data_len) != DB_SUCCESS)
 				{
@@ -15264,16 +15264,16 @@ ha_innobase::update_field_defs_with_zip_dict_info()
 				}
 				else
 				{
-					field->zip_dict_name.str= local_name;
-					field->zip_dict_name.length= local_name_len;
-					field->zip_dict_data.str= local_data;
-					field->zip_dict_data.length= local_data_len;
+					field->zip_dict_name.str = local_name;
+					field->zip_dict_name.length = local_name_len;
+					field->zip_dict_data.str = local_data;
+					field->zip_dict_data.length = local_data_len;
 				}
 			}
 			else
 			{
-				field->zip_dict_name= null_lex_cstr;
-				field->zip_dict_data= null_lex_cstr;
+				field->zip_dict_name = null_lex_cstr;
+				field->zip_dict_data = null_lex_cstr;
 			}
 		}
 	}

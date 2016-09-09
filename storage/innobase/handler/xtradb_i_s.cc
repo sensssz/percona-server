@@ -145,10 +145,10 @@ field_store_blob(
 	int	ret;
 
 	if (data != NULL) {
-		ret= field->store(data, data_len, system_charset_info);
+		ret = field->store(data, data_len, system_charset_info);
 		field->set_notnull();
 	} else {
-		ret= 0; /* success */
+		ret = 0; /* success */
 		field->set_null();
 	}
 
@@ -681,7 +681,7 @@ xtradb_i_s_dict_fill_sys_zip_dict(
 {
 	DBUG_ENTER("xtradb_i_s_dict_fill_sys_zip_dict");
 
-	Field**	fields= table_to_fill->field;
+	Field**	fields = table_to_fill->field;
 
 	OK(field_store_ulint(fields[zip_dict_field_id], id));
 	OK(field_store_string(fields[zip_dict_field_name], name));
@@ -717,12 +717,12 @@ xtradb_i_s_sys_zip_dict_fill_table(
 		DBUG_RETURN(0);
 	}
 
-	heap= mem_heap_create(1000);
+	heap = mem_heap_create(1000);
 	mutex_enter(&dict_sys->mutex);
 	mtr_start(&mtr);
 
-	rec= dict_startscan_system(&pcur, &mtr, SYS_ZIP_DICT);
-	ulint zip_size= dict_table_zip_size(pcur.btr_cur.index->table);
+	rec = dict_startscan_system(&pcur, &mtr, SYS_ZIP_DICT);
+	ulint zip_size = dict_table_zip_size(pcur.btr_cur.index->table);
 
 	while (rec) {
 		const char*	err_msg;
@@ -732,7 +732,7 @@ xtradb_i_s_sys_zip_dict_fill_table(
 		ulint		data_len;
 
 		/* Extract necessary information from a SYS_ZIP_DICT row */
-		err_msg= dict_process_sys_zip_dict(
+		err_msg = dict_process_sys_zip_dict(
 			heap, zip_size, rec, &id, &name, &data, &data_len);
 
 		mtr_commit(&mtr);
@@ -753,7 +753,7 @@ xtradb_i_s_sys_zip_dict_fill_table(
 		/* Get the next record */
 		mutex_enter(&dict_sys->mutex);
 		mtr_start(&mtr);
-		rec= dict_getnext_system(&pcur, &mtr);
+		rec = dict_getnext_system(&pcur, &mtr);
 	}
 
 	mtr_commit(&mtr);
@@ -767,15 +767,15 @@ static int i_s_xtradb_zip_dict_init(void* p)
 {
 	DBUG_ENTER("i_s_xtradb_zip_dict_init");
 
-	ST_SCHEMA_TABLE* schema= static_cast<ST_SCHEMA_TABLE*>(p);
+	ST_SCHEMA_TABLE* schema = static_cast<ST_SCHEMA_TABLE*>(p);
 
-	schema->fields_info= xtradb_sys_zip_dict_fields_info;
-	schema->fill_table= xtradb_i_s_sys_zip_dict_fill_table;
+	schema->fields_info = xtradb_sys_zip_dict_fields_info;
+	schema->fill_table = xtradb_i_s_sys_zip_dict_fill_table;
 
 	DBUG_RETURN(0);
 }
 
-UNIV_INTERN struct st_mysql_plugin	i_s_xtradb_zip_dict=
+UNIV_INTERN struct st_mysql_plugin	i_s_xtradb_zip_dict =
 {
 	STRUCT_FLD(type, MYSQL_INFORMATION_SCHEMA_PLUGIN),
 	STRUCT_FLD(info, &i_s_info),
@@ -799,7 +799,7 @@ enum zip_dict_cols_field_type
 	zip_dict_cols_field_dict_id
 };
 
-static ST_FIELD_INFO xtradb_sys_zip_dict_cols_fields_info[]=
+static ST_FIELD_INFO xtradb_sys_zip_dict_cols_fields_info[] =
 {
 	{ STRUCT_FLD(field_name, "table_id"),
 	STRUCT_FLD(field_length, MY_INT64_NUM_DECIMAL_DIGITS),
@@ -842,7 +842,7 @@ xtradb_i_s_dict_fill_sys_zip_dict_cols(
 {
 	DBUG_ENTER("xtradb_i_s_dict_fill_sys_zip_dict_cols");
 
-	Field**	fields= table_to_fill->field;
+	Field**	fields = table_to_fill->field;
 
 	OK(field_store_ulint(fields[zip_dict_cols_field_table_id], table_id));
 	OK(field_store_ulint(fields[zip_dict_cols_field_column_pos], column_pos));
@@ -877,11 +877,11 @@ xtradb_i_s_sys_zip_dict_cols_fill_table(
 		DBUG_RETURN(0);
 	}
 
-	heap= mem_heap_create(1000);
+	heap = mem_heap_create(1000);
 	mutex_enter(&dict_sys->mutex);
 	mtr_start(&mtr);
 
-	rec= dict_startscan_system(&pcur, &mtr, SYS_ZIP_DICT_COLS);
+	rec = dict_startscan_system(&pcur, &mtr, SYS_ZIP_DICT_COLS);
 
 	while (rec) {
 		const char*	err_msg;
@@ -890,7 +890,7 @@ xtradb_i_s_sys_zip_dict_cols_fill_table(
 		ulint dict_id;
 
 		/* Extract necessary information from a SYS_ZIP_DICT_COLS row */
-		err_msg= dict_process_sys_zip_dict_cols(
+		err_msg = dict_process_sys_zip_dict_cols(
 			heap, rec, &table_id, &column_pos, &dict_id);
 
 		mtr_commit(&mtr);
@@ -911,7 +911,7 @@ xtradb_i_s_sys_zip_dict_cols_fill_table(
 		/* Get the next record */
 		mutex_enter(&dict_sys->mutex);
 		mtr_start(&mtr);
-		rec= dict_getnext_system(&pcur, &mtr);
+		rec = dict_getnext_system(&pcur, &mtr);
 	}
 
 	mtr_commit(&mtr);
@@ -925,15 +925,15 @@ static int i_s_xtradb_zip_dict_cols_init(void* p)
 {
 	DBUG_ENTER("i_s_xtradb_zip_dict_cols_init");
 
-	ST_SCHEMA_TABLE* schema= static_cast<ST_SCHEMA_TABLE*>(p);
+	ST_SCHEMA_TABLE* schema = static_cast<ST_SCHEMA_TABLE*>(p);
 
-	schema->fields_info= xtradb_sys_zip_dict_cols_fields_info;
-	schema->fill_table= xtradb_i_s_sys_zip_dict_cols_fill_table;
+	schema->fields_info = xtradb_sys_zip_dict_cols_fields_info;
+	schema->fill_table = xtradb_i_s_sys_zip_dict_cols_fill_table;
 
 	DBUG_RETURN(0);
 }
 
-UNIV_INTERN struct st_mysql_plugin	i_s_xtradb_zip_dict_cols=
+UNIV_INTERN struct st_mysql_plugin	i_s_xtradb_zip_dict_cols =
 {
 	STRUCT_FLD(type, MYSQL_INFORMATION_SCHEMA_PLUGIN),
 	STRUCT_FLD(info, &i_s_info),

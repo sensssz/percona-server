@@ -2637,7 +2637,7 @@ row_sel_field_store_in_mysql_format_func(
 		if (templ->mysql_type == DATA_MYSQL_TRUE_VARCHAR) {
 			/* If this is a compressed column, decompress it first*/
 			if (templ->compressed)
-				data= row_decompress_column(data, &len,
+				data = row_decompress_column(data, &len,
 					reinterpret_cast<const byte*>(
 						templ->zip_dict_data.str),
 					templ->zip_dict_data.length, prebuilt);

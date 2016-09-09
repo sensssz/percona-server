@@ -6792,7 +6792,7 @@ dict_create_zip_dict(
 	const char*	data,		/*!< in: zip_dict data */
 	ulint		data_len)	/*!< in: zip_dict data length */
 {
-	dberr_t		err= DB_SUCCESS;
+	dberr_t		err = DB_SUCCESS;
 	trx_t*		trx;
 
 	ut_ad(name);
@@ -6801,12 +6801,12 @@ dict_create_zip_dict(
 	rw_lock_x_lock(&dict_operation_lock);
 	dict_mutex_enter_for_mysql();
 
-	trx= trx_allocate_for_background();
-	trx->op_info= "insert zip_dict";
-	trx->dict_operation_lock_mode= RW_X_LATCH;
+	trx = trx_allocate_for_background();
+	trx->op_info = "insert zip_dict";
+	trx->dict_operation_lock_mode = RW_X_LATCH;
 	trx_start_if_not_started(trx);
 
-	err= dict_create_add_zip_dict(name, name_len, data, data_len, trx);
+	err = dict_create_add_zip_dict(name, name_len, data, data_len, trx);
 
 	if (err == DB_SUCCESS)
 	{
@@ -6814,12 +6814,12 @@ dict_create_zip_dict(
 	}
 	else
 	{
-		trx->op_info= "rollback of internal trx on zip_dict table";
+		trx->op_info = "rollback of internal trx on zip_dict table";
 		trx_rollback_to_savepoint(trx, NULL);
 		ut_a(trx->error_state == DB_SUCCESS);
 	}
-	trx->op_info= "";
-	trx->dict_operation_lock_mode= 0;
+	trx->op_info = "";
+	trx->dict_operation_lock_mode = 0;
 	trx_free_for_background(trx);
 
 	dict_mutex_exit_for_mysql();
@@ -6837,21 +6837,21 @@ dict_get_dictionary_id_by_key(
 	ulint	column_pos,	/*!< in: column position */
 	ulint*	dict_id)	/*!< out: zip_dict id */
 {
-	dberr_t		err= DB_SUCCESS;
+	dberr_t		err = DB_SUCCESS;
 	trx_t*		trx;
 
 	rw_lock_s_lock(&dict_operation_lock);
 	dict_mutex_enter_for_mysql();
 
-	trx= trx_allocate_for_background();
-	trx->op_info= "get zip dict id by composite key";
-	trx->dict_operation_lock_mode= RW_S_LATCH;
+	trx = trx_allocate_for_background();
+	trx->op_info = "get zip dict id by composite key";
+	trx->dict_operation_lock_mode = RW_S_LATCH;
 	trx_start_if_not_started(trx);
 
-	err= dict_create_get_zip_dict_id_by_reference(table_id, column_pos, dict_id, trx);
+	err = dict_create_get_zip_dict_id_by_reference(table_id, column_pos, dict_id, trx);
 
 	trx_commit_for_mysql(trx);
-	trx->dict_operation_lock_mode= 0;
+	trx->dict_operation_lock_mode = 0;
 	trx_free_for_background(trx);
 
 	dict_mutex_exit_for_mysql();
@@ -6872,21 +6872,21 @@ dict_get_dictionary_info_by_id(
 	char**	data,		/*!< out: dictionary data */
 	ulint*	data_len)	/*!< out: dictionary data length*/
 {
-	dberr_t		err= DB_SUCCESS;
+	dberr_t		err = DB_SUCCESS;
 	trx_t*		trx;
 
 	rw_lock_s_lock(&dict_operation_lock);
 	dict_mutex_enter_for_mysql();
 
-	trx= trx_allocate_for_background();
-	trx->op_info= "get zip dict name and data by id";
-	trx->dict_operation_lock_mode= RW_S_LATCH;
+	trx = trx_allocate_for_background();
+	trx->op_info = "get zip dict name and data by id";
+	trx->dict_operation_lock_mode = RW_S_LATCH;
 	trx_start_if_not_started(trx);
 
-	err= dict_create_get_zip_dict_info_by_id(dict_id, name, name_len, data, data_len, trx);
+	err = dict_create_get_zip_dict_info_by_id(dict_id, name, name_len, data, data_len, trx);
 
 	trx_commit_for_mysql(trx);
-	trx->dict_operation_lock_mode= 0;
+	trx->dict_operation_lock_mode = 0;
 	trx_free_for_background(trx);
 
 	dict_mutex_exit_for_mysql();
@@ -6902,7 +6902,7 @@ dict_drop_zip_dict(
 	const char*	name,		/*!< in: zip_dict name */
 	ulint		name_len)	/*!< in: zip_dict name length*/
 {
-	dberr_t		err= DB_SUCCESS;
+	dberr_t		err = DB_SUCCESS;
 	trx_t*		trx;
 
 	ut_ad(name);
@@ -6910,12 +6910,12 @@ dict_drop_zip_dict(
 	rw_lock_x_lock(&dict_operation_lock);
 	dict_mutex_enter_for_mysql();
 
-	trx= trx_allocate_for_background();
-	trx->op_info= "delete zip_dict";
-	trx->dict_operation_lock_mode= RW_X_LATCH;
+	trx = trx_allocate_for_background();
+	trx->op_info = "delete zip_dict";
+	trx->dict_operation_lock_mode = RW_X_LATCH;
 	trx_start_if_not_started(trx);
 
-	err= dict_create_remove_zip_dict(name, name_len, trx);
+	err = dict_create_remove_zip_dict(name, name_len, trx);
 
 	if (err == DB_SUCCESS)
 	{
@@ -6923,12 +6923,12 @@ dict_drop_zip_dict(
 	}
 	else
 	{
-		trx->op_info= "rollback of internal trx on zip_dict table";
+		trx->op_info = "rollback of internal trx on zip_dict table";
 		trx_rollback_to_savepoint(trx, NULL);
 		ut_a(trx->error_state == DB_SUCCESS);
 	}
-	trx->op_info= "";
-	trx->dict_operation_lock_mode= 0;
+	trx->op_info = "";
+	trx->dict_operation_lock_mode = 0;
 	trx_free_for_background(trx);
 
 	dict_mutex_exit_for_mysql();

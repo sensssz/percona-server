@@ -2592,7 +2592,7 @@ prepare_inplace_alter_table_dict(
 	dberr_t			error;
 	ulint			num_fts_index;
 	ha_innobase_inplace_ctx*ctx;
-	const char*		err_zip_field_name= 0;
+	const char*		err_zip_field_name = 0;
 
 	DBUG_ENTER("prepare_inplace_alter_table_dict");
 
@@ -3093,7 +3093,7 @@ op_ok:
 	*/
 	if (altered_table->has_compressed_columns_with_dictionaries())
 	{
-		error= innobase_create_zip_dict_references(altered_table,
+		error = innobase_create_zip_dict_references(altered_table,
 				table_name, ctx->trx->table_id, ctx->trx,
 				&err_zip_field_name);
 		if (error != DB_SUCCESS)

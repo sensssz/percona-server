@@ -76,7 +76,7 @@ UNIV_INTERN ibool	row_rollback_on_timeout	= FALSE;
 Compression level to be used by zlib for compressed-blob columns.
 Settable by user.
 */
-UNIV_INTERN uint	srv_compressed_columns_zip_level= DEFAULT_COMPRESSION_LEVEL;
+UNIV_INTERN uint	srv_compressed_columns_zip_level = DEFAULT_COMPRESSION_LEVEL;
 /**
 (Z_FILTERED | Z_HUFFMAN_ONLY | Z_RLE | Z_FIXED | Z_DEFAULT_STRATEGY)
 
@@ -94,20 +94,20 @@ affects the compression ratio but not the correctness of the compressed output
 even if it is not set appropriately. Z_FIXED prevents the use of dynamic
 Huffman codes, allowing for a simpler decoder for special applications.
 */
-const uint	srv_compressed_columns_zlib_strategy= Z_DEFAULT_STRATEGY;
+const uint	srv_compressed_columns_zlib_strategy = Z_DEFAULT_STRATEGY;
 /** Compress the column if the data length exceeds this value. */
-UNIV_INTERN ulong	srv_compressed_columns_threshold= 96;
+UNIV_INTERN ulong	srv_compressed_columns_threshold = 96;
 /**
 Determine if zlib needs to compute adler32 value for the compressed data.
 This variables is similar to page_zip_zlib_wrap, but only used by
 compressed blob columns.
 */
-const bool	srv_compressed_columns_zlib_wrap= true;
+const bool	srv_compressed_columns_zlib_wrap = true;
 /**
 Determine if zlib will use custom memory allocation functions based on
 InnoDB memory heap routines (mem_heap_t*).
 */
-const bool	srv_compressed_columns_zlib_use_heap= false;
+const bool	srv_compressed_columns_zlib_use_heap = false;
 /** Chain node of the list of tables to drop in the background. */
 struct row_mysql_drop_t{
 	char*				table_name;	/*!< table name */
@@ -219,7 +219,7 @@ row_mysql_prebuilt_free_compress_heap(
 					ha_innobase:: table handle */
 {
 	mem_heap_free(prebuilt->compress_heap);
-	prebuilt->compress_heap= NULL;
+	prebuilt->compress_heap = NULL;
 }
 
 /*******************************************************************//**
@@ -298,46 +298,46 @@ row_mysql_read_true_varchar(
   original (uncompressed) block size. These 'len-len' bytes are followed by
   compressed representation of the original data.
   * If 'compressed' bit is set to 0, every other bitfield ('wrap', 'algorithm' and
-  'le-len') can be ignored. In this case the header is immediately followed by
+  'le-len') must be ignored. In this case the header is immediately followed by
   uncompressed (original) data.
 */
 
 /** Currently the only supported value for the 'reserved' field is false (0).*/
-static const bool default_zip_column_reserved_value= false;
+static const bool default_zip_column_reserved_value = false;
 
 /**
   Currently the only supported value for the 'algorithm' field is 0, which
   means 'zlib'.
 */
-static const uint default_zip_column_algorithm_value= 0;
+static const uint default_zip_column_algorithm_value = 0;
 
-static const size_t zip_column_prefix_max_length= 10;
-static const size_t zip_column_header_length= 2;
+static const size_t zip_column_prefix_max_length = 10;
+static const size_t zip_column_header_length = 2;
 
 /* 'reserved', bit 0 */
-static const uint zip_column_reserved= 0;
+static const uint zip_column_reserved = 0;
 /* 0000 0000 0000 0001 */
-static const uint zip_column_reserved_mask= 0x0001;
+static const uint zip_column_reserved_mask = 0x0001;
 
 /* 'wrap', bit 1 */
-static const uint zip_column_wrap= 1;
+static const uint zip_column_wrap = 1;
 /* 0000 0000 0000 0010 */
-static const uint zip_column_wrap_mask= 0x0002;
+static const uint zip_column_wrap_mask = 0x0002;
 
 /* 'algorithm', bit 2,3,4,5,6 */
-static const uint zip_column_algorithm= 2;
+static const uint zip_column_algorithm = 2;
 /* 0000 0000 0111 1100 */
-static const uint zip_column_algorithm_mask= 0x007C;
+static const uint zip_column_algorithm_mask = 0x007C;
 
 /* 'len-len', bit 7,8,9 */
-static const uint zip_column_data_length= 7;
+static const uint zip_column_data_length = 7;
 /* 0000 0011 1000 0000 */
-static const uint zip_column_data_length_mask= 0x0380;
+static const uint zip_column_data_length_mask = 0x0380;
 
 /* 'compressed', bit 10 */
-static const uint zip_column_compressed= 10;
+static const uint zip_column_compressed = 10;
 /* 0000 0100 0000 0000 */
-static const uint zip_column_compressed_mask= 0x0400;
+static const uint zip_column_compressed_mask = 0x0400;
 
 /** Updates compressed block header with the given components */
 static void
@@ -349,13 +349,13 @@ column_set_compress_header(
 	bool	wrap,
 	bool	reserved)
 {
-	ulint header= 0;
-	header= 0x00;
-	header|= (compressed << zip_column_compressed);
-	header|= (lenlen << zip_column_data_length);
-	header|= (alg << zip_column_algorithm);
-	header|= (wrap << zip_column_wrap);
-	header|= (reserved << zip_column_reserved);
+	ulint header = 0;
+	header = 0x00;
+	header |= (compressed << zip_column_compressed);
+	header |= (lenlen << zip_column_data_length);
+	header |= (alg << zip_column_algorithm);
+	header |= (wrap << zip_column_wrap);
+	header |= (reserved << zip_column_reserved);
 	mach_write_to_2(data, header);
 }
 
@@ -370,12 +370,12 @@ column_get_compress_header(
 	bool*		reserved
 )
 {
-	ulint header= mach_read_from_2(data);
-	*compressed= ((header & zip_column_compressed_mask) >> zip_column_compressed);
-	*lenlen= ((header & zip_column_data_length_mask) >> zip_column_data_length);
-	*alg= ((header & zip_column_algorithm_mask) >> zip_column_algorithm);
-	*wrap= ((header & zip_column_wrap_mask) >> zip_column_wrap);
-	*reserved= ((header & zip_column_reserved_mask) >> zip_column_reserved);
+	ulint header = mach_read_from_2(data);
+	*compressed = ((header & zip_column_compressed_mask) >> zip_column_compressed);
+	*lenlen = ((header & zip_column_data_length_mask) >> zip_column_data_length);
+	*alg = ((header & zip_column_algorithm_mask) >> zip_column_algorithm);
+	*wrap = ((header & zip_column_wrap_mask) >> zip_column_wrap);
+	*reserved = ((header & zip_column_reserved_mask) >> zip_column_reserved);
 }
 
 /** Allocate memory for zlib. */
@@ -405,16 +405,16 @@ column_zip_set_alloc(
 	void*		stream,	/*!< in/out: zlib stream */
 	mem_heap_t*	heap)	/*!< in: memory heap to use */
 {
-	z_stream* strm= static_cast<z_stream*>(stream);
+	z_stream* strm = static_cast<z_stream*>(stream);
 
 	if (srv_compressed_columns_zlib_use_heap) {
-		strm->zalloc= column_zip_zalloc;
-		strm->zfree= column_zip_free;
-		strm->opaque= heap;
+		strm->zalloc = column_zip_zalloc;
+		strm->zfree = column_zip_free;
+		strm->opaque = heap;
 	} else {
-		strm->zalloc= (alloc_func)0;
-		strm->zfree= (free_func)0;
-		strm->opaque= (voidpf)0;
+		strm->zalloc = (alloc_func)0;
+		strm->zfree = (free_func)0;
+		strm->opaque = (voidpf)0;
 	}
 }
 
@@ -429,56 +429,56 @@ row_compress_column(
 	ulint		dict_data_len,	/*!< in: optional dictionary data length */
 	row_prebuilt_t*	prebuilt)	/*!< in: use prebuilt->compress_heap only here*/
 {
-	int err= 0;
-	ulint comp_len= *len;
-	ulint buf_len= *len + zip_column_prefix_max_length;
+	int err = 0;
+	ulint comp_len = *len;
+	ulint buf_len = *len + zip_column_prefix_max_length;
 	byte* buf;
 	byte* ptr;
 	z_stream c_stream;
-	bool wrap= srv_compressed_columns_zlib_wrap;
+	bool wrap = srv_compressed_columns_zlib_wrap;
 
-	int window_bits= wrap ? MAX_WBITS : -MAX_WBITS;
+	int window_bits = wrap ? MAX_WBITS : -MAX_WBITS;
 
 	if (!prebuilt->compress_heap) {
-		prebuilt->compress_heap=
+		prebuilt->compress_heap =
 			mem_heap_create(max(UNIV_PAGE_SIZE, buf_len));
 	}
 
-	buf= static_cast<byte*>(mem_heap_zalloc(
+	buf = static_cast<byte*>(mem_heap_zalloc(
 			prebuilt->compress_heap,buf_len));
 
 	if (*len < srv_compressed_columns_threshold ||
 		srv_compressed_columns_zip_level == Z_NO_COMPRESSION)
 		goto do_not_compress;
 
-	ptr= buf + zip_column_header_length + lenlen;
+	ptr = buf + zip_column_header_length + lenlen;
 
 	/*init deflate object*/
-	c_stream.next_in= const_cast<Bytef*>(data);
-	c_stream.avail_in= *len;
-	c_stream.next_out= ptr;
-	c_stream.avail_out= comp_len;
+	c_stream.next_in = const_cast<Bytef*>(data);
+	c_stream.avail_in = *len;
+	c_stream.next_out = ptr;
+	c_stream.avail_out = comp_len;
 
 	column_zip_set_alloc(&c_stream, prebuilt->compress_heap);
 
-	err= deflateInit2(&c_stream, srv_compressed_columns_zip_level,
+	err = deflateInit2(&c_stream, srv_compressed_columns_zip_level,
 		Z_DEFLATED, window_bits, MAX_MEM_LEVEL, srv_compressed_columns_zlib_strategy);
 	ut_a(err == Z_OK);
 
 	if (dict_data != 0 && dict_data_len != 0)
 	{
-		err= deflateSetDictionary(&c_stream, dict_data, dict_data_len);
+		err = deflateSetDictionary(&c_stream, dict_data, dict_data_len);
 		ut_a(err == Z_OK);
 	}
 
-	err= deflate(&c_stream, Z_FINISH);
+	err = deflate(&c_stream, Z_FINISH);
 	if (err != Z_STREAM_END) {
 		deflateEnd(&c_stream);
 		if (err == Z_OK)
-			err= Z_BUF_ERROR;
+			err = Z_BUF_ERROR;
 	} else {
-		comp_len= c_stream.total_out;
-		err= deflateEnd(&c_stream);
+		comp_len = c_stream.total_out;
+		err = deflateEnd(&c_stream);
 	}
 
 	switch (err) {
@@ -497,7 +497,7 @@ row_compress_column(
 		column_set_compress_header(buf, true, lenlen - 1,
 			default_zip_column_algorithm_value, wrap,
 			default_zip_column_reserved_value);
-		ptr= buf + zip_column_header_length;
+		ptr = buf + zip_column_header_length;
 		/*store the uncompressed data length*/
 		switch (lenlen) {
 		case 1:
@@ -516,18 +516,18 @@ row_compress_column(
 			ut_error;
 		}
 
-		*len= comp_len + zip_column_header_length + lenlen;
+		*len = comp_len + zip_column_header_length + lenlen;
 		return buf;
 	}
 
 do_not_compress:
-	ptr= buf;
+	ptr = buf;
 	column_set_compress_header(ptr, false, 0,
 		default_zip_column_algorithm_value, false,
 		default_zip_column_reserved_value);
-	ptr+= zip_column_header_length;
+	ptr += zip_column_header_length;
 	memcpy(ptr, data, *len);
-	*len+= zip_column_header_length;
+	*len += zip_column_header_length;
 	return buf;
 }
 
@@ -541,101 +541,99 @@ row_decompress_column(
 	ulint		dict_data_len,	/*!< in: optional dictionary data length */
 	row_prebuilt_t*	prebuilt)	/*!< in: use prebuilt->compress_heap only here*/
 {
-	ulint buf_len= 0;
+	ulint buf_len = 0;
 	byte* buf;
-	int err= 0;
-	int window_bits= 0;
+	int err = 0;
+	int window_bits = 0;
 	z_stream d_stream;
-	bool is_compressed= false;
-	bool wrap= false;
-	bool reserved= false;
-	ulint lenlen= 0;
-	uint alg= 0;
+	bool is_compressed = false;
+	bool wrap = false;
+	bool reserved = false;
+	ulint lenlen = 0;
+	uint alg = 0;
 
 	column_get_compress_header(data, &is_compressed, &lenlen, &alg, &wrap,
 		&reserved);
 
 	if (reserved != default_zip_column_reserved_value) {
-		ib_logf(IB_LOG_LEVEL_ERROR, "unsupported compressed BLOB header format\n");
-		ut_error;
+		ib_logf(IB_LOG_LEVEL_FATAL, "unsupported compressed BLOB header format\n");
 	}
 
 	if (alg != default_zip_column_algorithm_value) {
-		ib_logf(IB_LOG_LEVEL_ERROR,
+		ib_logf(IB_LOG_LEVEL_FATAL,
 			"unsupported 'algorithm' value in the compressed BLOB header\n");
-		ut_error;
 	}
 
 	ut_a(lenlen < 4);
 
-	data+= zip_column_header_length;
+	data += zip_column_header_length;
 	if (!is_compressed) { /* column not compressed */
-		*len-= zip_column_header_length;
+		*len -= zip_column_header_length;
 		return data;
 	}
 
 	lenlen++;
 
-	ulint comp_len= *len - zip_column_header_length - lenlen;
+	ulint comp_len = *len - zip_column_header_length - lenlen;
 
-	ulint uncomp_len= 0;
+	ulint uncomp_len = 0;
 	switch (lenlen) {
 	case 1:
-		uncomp_len= mach_read_from_1(data);
+		uncomp_len = mach_read_from_1(data);
 		break;
 	case 2:
-		uncomp_len= mach_read_from_2(data);
+		uncomp_len = mach_read_from_2(data);
 		break;
 	case 3:
-		uncomp_len= mach_read_from_3(data);
+		uncomp_len = mach_read_from_3(data);
 		break;
 	case 4:
-		uncomp_len= mach_read_from_4(data);
+		uncomp_len = mach_read_from_4(data);
 		break;
 	default:
 		ut_error;
 	}
 
-	data+= lenlen;
+	data += lenlen;
 
 	/* data is compressed, decompress it*/
 	if (!prebuilt->compress_heap) {
-		prebuilt->compress_heap=
+		prebuilt->compress_heap =
 			mem_heap_create(max(UNIV_PAGE_SIZE, uncomp_len));
 	}
 
-	buf_len= uncomp_len;
-	buf= static_cast<byte*>(mem_heap_zalloc(
+	buf_len = uncomp_len;
+	buf = static_cast<byte*>(mem_heap_zalloc(
 				 prebuilt->compress_heap, buf_len));
 
 	/* init d_stream */
-	d_stream.next_in= (Bytef *)data;
-	d_stream.avail_in= comp_len;
-	d_stream.next_out= buf;
-	d_stream.avail_out= buf_len;
+	d_stream.next_in = (Bytef *)data;
+	d_stream.avail_in = comp_len;
+	d_stream.next_out = buf;
+	d_stream.avail_out = buf_len;
 
 	column_zip_set_alloc(&d_stream, prebuilt->compress_heap);
 
-	window_bits= wrap ? MAX_WBITS : -MAX_WBITS;
-	err= inflateInit2(&d_stream, window_bits);
+	window_bits = wrap ? MAX_WBITS : -MAX_WBITS;
+	err = inflateInit2(&d_stream, window_bits);
 	ut_a(err == Z_OK);
 
-	err= inflate(&d_stream, Z_FINISH);
+	err = inflate(&d_stream, Z_FINISH);
 	if (err == Z_NEED_DICT)
 	{
 		ut_a(dict_data != 0 && dict_data_len != 0);
-		err= inflateSetDictionary(&d_stream, dict_data, dict_data_len);
+		err = inflateSetDictionary(&d_stream, dict_data, dict_data_len);
 		ut_a(err == Z_OK);
-		err= inflate(&d_stream, Z_FINISH);
+		err = inflate(&d_stream, Z_FINISH);
 	}
 
 	if (err != Z_STREAM_END) {
 		inflateEnd(&d_stream);
 		if (err == Z_BUF_ERROR && d_stream.avail_in == 0)
-			err= Z_DATA_ERROR;
+			err = Z_DATA_ERROR;
 	} else {
-		buf_len= d_stream.total_out;
-		err= inflateEnd(&d_stream);
+		buf_len = d_stream.total_out;
+		err = inflateEnd(&d_stream);
 	}
 
 	switch (err) {
@@ -650,18 +648,17 @@ row_decompress_column(
 
 	if (err == Z_OK)
 	{
-		*len= buf_len;
+		*len = buf_len;
 		if (buf_len != uncomp_len)
 		{
-			ib_logf(IB_LOG_LEVEL_ERROR, "failed to decompress blob column, may be corrupted\n");
-			ut_error;
+			ib_logf(IB_LOG_LEVEL_FATAL, "failed to decompress blob column, may be corrupted\n");
 		}
 
 		return buf;
 	}
 
 	ib_logf(IB_LOG_LEVEL_ERROR, "failed to decompress column, this shouldn't happen!\n");
-	*len-= (zip_column_header_length + lenlen);
+	*len -= (zip_column_header_length + lenlen);
 	return data;
 }
 
@@ -702,10 +699,10 @@ row_mysql_store_blob_ref(
 	ut_a(col_len - 8 > 2 || len < 256 * 256);
 	ut_a(col_len - 8 > 3 || len < 256 * 256 * 256);
 
-	const byte *ptr= NULL;
+	const byte *ptr = NULL;
 
 	if (need_decompression)
-		ptr= row_decompress_column((const byte*)data, &len, dict_data, dict_data_len, prebuilt);
+		ptr = row_decompress_column((const byte*)data, &len, dict_data, dict_data_len, prebuilt);
 
 	if (ptr)
 		memcpy(dest + col_len - 8, &ptr, sizeof ptr);
@@ -732,17 +729,17 @@ row_mysql_read_blob_ref(
 	ulint		dict_data_len,		/*!< in: optional compression dictionary data length */
 	row_prebuilt_t*	prebuilt)		/*!< in: use prebuilt->compress_heap only here */
 {
-	byte*	data= NULL;
-	byte*	ptr= NULL;
+	byte*	data = NULL;
+	byte*	ptr = NULL;
 
 	*len = mach_read_from_n_little_endian(ref, col_len - 8);
 
 	memcpy(&data, ref + col_len - 8, sizeof data);
 
 	if (need_compression) {
-		ptr= row_compress_column(data, len, col_len - 8, dict_data, dict_data_len, prebuilt);
+		ptr = row_compress_column(data, len, col_len - 8, dict_data, dict_data_len, prebuilt);
 		if (ptr)
-			data= ptr;
+			data = ptr;
 	}
 
 	return(data);
@@ -884,11 +881,11 @@ row_mysql_store_col_in_innobase_format(
 				lenlen = 2;
 			}
 
-			const byte* tmp_ptr= row_mysql_read_true_varchar(&col_len, mysql_data, lenlen);
+			const byte* tmp_ptr = row_mysql_read_true_varchar(&col_len, mysql_data, lenlen);
 			if (need_compression)
-				ptr= row_compress_column(tmp_ptr, &col_len, lenlen, dict_data, dict_data_len, prebuilt);
+				ptr = row_compress_column(tmp_ptr, &col_len, lenlen, dict_data, dict_data_len, prebuilt);
 			else
-				ptr= tmp_ptr;
+				ptr = tmp_ptr;
 		} else {
 			/* Remove trailing spaces from old style VARCHAR
 			columns. */
@@ -970,7 +967,7 @@ row_mysql_store_col_in_innobase_format(
 		}
 	} else if (type == DATA_BLOB && row_format_col) {
 
-		ptr= row_mysql_read_blob_ref(&col_len, mysql_data, col_len,
+		ptr = row_mysql_read_blob_ref(&col_len, mysql_data, col_len,
 				need_compression, dict_data, dict_data_len, prebuilt);
 	}
 
@@ -4728,7 +4725,7 @@ row_drop_table_for_mysql(
 
 		/* Remove all compression dictionary references for the
 		table */
-		err= dict_create_remove_zip_dict_references_for_table(table->id, trx);
+		err = dict_create_remove_zip_dict_references_for_table(table->id, trx);
 		if (err != DB_SUCCESS) {
 			ib_logf(IB_LOG_LEVEL_ERROR, "Error: (%s) not "
 				"able to remove compression dictionary "
