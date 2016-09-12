@@ -214,3 +214,43 @@ test.t2	2260691284
 SET GLOBAL innodb_compressed_columns_zip_level = @old_innodb_compressed_columns_zip_level;
 SET GLOBAL innodb_compressed_columns_threshold = @old_innodb_compressed_columns_threshold;
 DROP TABLE t1, t2, t3, t4, t5, t6, t7, t8, t9;
+SET @saved_innodb_compressed_columns_threshold = @@global.innodb_compressed_columns_threshold;
+CREATE TABLE t1(
+a VARCHAR(1) COLUMN_FORMAT COMPRESSED
+) ENGINE=InnoDB;
+INSERT INTO t1 VALUES(REPEAT('abc',40));
+Warnings:
+Warning	1265	Data truncated for column 'a' at row 1
+SELECT * FROM t1;
+a
+a
+DROP TABLE t1;
+CREATE TABLE t1(
+a VARCHAR(95) COLUMN_FORMAT COMPRESSED
+) ENGINE=InnoDB;
+INSERT INTO t1 VALUES(REPEAT('abc',40));
+Warnings:
+Warning	1265	Data truncated for column 'a' at row 1
+SELECT * FROM t1;
+a
+abcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcab
+DROP TABLE t1;
+CREATE TABLE t1(
+a VARCHAR(96) COLUMN_FORMAT COMPRESSED
+) ENGINE=InnoDB;
+INSERT INTO t1 VALUES(REPEAT('abc',40));
+Warnings:
+Warning	1265	Data truncated for column 'a' at row 1
+SELECT * FROM t1;
+a
+abcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabc
+SET GLOBAL innodb_compressed_columns_threshold = 1;
+INSERT INTO t1 VALUES(REPEAT('abc',40));
+Warnings:
+Warning	1265	Data truncated for column 'a' at row 1
+SELECT * FROM t1;
+a
+abcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabc
+abcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabc
+DROP TABLE t1;
+SET GLOBAL innodb_compressed_columns_threshold = @saved_innodb_compressed_columns_threshold;

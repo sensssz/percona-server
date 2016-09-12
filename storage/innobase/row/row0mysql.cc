@@ -311,8 +311,8 @@ static const bool default_zip_column_reserved_value = false;
 */
 static const uint default_zip_column_algorithm_value = 0;
 
-static const size_t zip_column_prefix_max_length = 10;
-static const size_t zip_column_header_length = 2;
+static const size_t zip_column_prefix_max_length = COMPRESSED_COLUMN_HEADER_LENGTH + 8;
+static const size_t zip_column_header_length = COMPRESSED_COLUMN_HEADER_LENGTH;
 
 /* 'reserved', bit 0 */
 static const uint zip_column_reserved = 0;

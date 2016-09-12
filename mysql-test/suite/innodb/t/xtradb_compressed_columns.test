@@ -129,3 +129,35 @@ CHECKSUM TABLE t1, t2;
 SET GLOBAL innodb_compressed_columns_zip_level = @old_innodb_compressed_columns_zip_level;
 SET GLOBAL innodb_compressed_columns_threshold = @old_innodb_compressed_columns_threshold;
 DROP TABLE t1, t2, t3, t4, t5, t6, t7, t8, t9;
+
+# Bug lp:1621708 "InnoDB: Failing assertion: len <= col->len || col->mtype == 5 || (col->len == 0 && col->mtype == 1) Edit"
+SET @saved_innodb_compressed_columns_threshold = @@global.innodb_compressed_columns_threshold;
+
+CREATE TABLE t1(
+  a VARCHAR(1) COLUMN_FORMAT COMPRESSED
+) ENGINE=InnoDB;
+INSERT INTO t1 VALUES(REPEAT('abc',40));
+SELECT * FROM t1;
+DROP TABLE t1;
+
+--let $threshold = `SELECT @@global.innodb_compressed_columns_threshold`
+--dec $threshold
+eval CREATE TABLE t1(
+  a VARCHAR($threshold) COLUMN_FORMAT COMPRESSED
+) ENGINE=InnoDB;
+INSERT INTO t1 VALUES(REPEAT('abc',40));
+SELECT * FROM t1;
+DROP TABLE t1;
+
+--inc $threshold
+eval CREATE TABLE t1(
+  a VARCHAR($threshold) COLUMN_FORMAT COMPRESSED
+) ENGINE=InnoDB;
+INSERT INTO t1 VALUES(REPEAT('abc',40));
+SELECT * FROM t1;
+SET GLOBAL innodb_compressed_columns_threshold = 1;
+INSERT INTO t1 VALUES(REPEAT('abc',40));
+SELECT * FROM t1;
+DROP TABLE t1;
+
+SET GLOBAL innodb_compressed_columns_threshold = @saved_innodb_compressed_columns_threshold;

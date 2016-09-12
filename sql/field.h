@@ -3250,10 +3250,14 @@ public:
   bool zero_pack() const { return 0; }
   type_conversion_status reset(void)
   {
-    memset(ptr, 0, field_length+length_bytes);
+    memset(ptr, 0, pack_length());
     return TYPE_OK;
   }
-  uint32 pack_length() const { return (uint32) field_length+length_bytes; }
+  uint32 pack_length() const
+  {
+    return (uint32) field_length + length_bytes +
+      (column_format() == COLUMN_FORMAT_TYPE_COMPRESSED ? COMPRESSED_COLUMN_HEADER_LENGTH : 0);
+  }
   uint32 key_length() const { return (uint32) field_length; }
   uint32 sort_length() const
   {
