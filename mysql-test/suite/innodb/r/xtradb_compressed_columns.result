@@ -254,3 +254,8 @@ abcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcab
 abcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabc
 DROP TABLE t1;
 SET GLOBAL innodb_compressed_columns_threshold = @saved_innodb_compressed_columns_threshold;
+CREATE TABLE t1(
+id INT
+);
+ALTER TABLE t1 ADD COLUMN c VARCHAR(1000) COLUMN_FORMAT COMPRESSED;
+DROP TABLE t1;

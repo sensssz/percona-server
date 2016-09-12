@@ -910,7 +910,7 @@ public:
 
   /**
     Checks if the field has COLUMN_FORMAT_TYPE_COMPRESSED flag and non-empty
-    associated xompression dictionary.
+    associated compression dictionary.
   */
   bool has_associated_compression_dictionary() const
   {
@@ -3970,7 +3970,7 @@ Field *make_field(TABLE_SHARE *share, uchar *ptr, uint32 field_length,
 		  TYPELIB *interval, const char *field_name);
 uint pack_length_to_packflag(uint type);
 enum_field_types get_blob_type_from_length(ulong length);
-uint32 calc_pack_length(enum_field_types type,uint32 length);
+uint32 calc_pack_length(enum_field_types type,uint32 length, bool compressed);
 type_conversion_status set_field_to_null(Field *field);
 type_conversion_status set_field_to_null_with_conversions(Field *field,
                                                           bool no_conversions);

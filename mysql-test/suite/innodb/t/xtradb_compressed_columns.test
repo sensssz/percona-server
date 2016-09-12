@@ -161,3 +161,11 @@ SELECT * FROM t1;
 DROP TABLE t1;
 
 SET GLOBAL innodb_compressed_columns_threshold = @saved_innodb_compressed_columns_threshold;
+
+# Bug lp:1622588 "handle_fatal_signal (sig=11) in free_root from TABLE_SHARE::destroy on ALTER TABLE t1 ADD COLUMN ... COLUMN_FORMAT COMPRESSED"
+CREATE TABLE t1(
+  id INT
+);
+ALTER TABLE t1 ADD COLUMN c VARCHAR(1000) COLUMN_FORMAT COMPRESSED;
+
+DROP TABLE t1;
