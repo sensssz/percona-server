@@ -2531,11 +2531,13 @@ create:
           {
             Lex->sql_command= SQLCOM_CREATE_SERVER;
           }
-        | CREATE COMPRESSION_DICTIONARY_SYM ident '(' create_compression_dictionary_allowed_expr ')'
+        | CREATE COMPRESSION_DICTIONARY_SYM opt_if_not_exists ident
+          '(' create_compression_dictionary_allowed_expr ')'
           {
             Lex->sql_command= SQLCOM_CREATE_COMPRESSION_DICTIONARY;
-            Lex->ident= $3;
-            Lex->default_value= $5;
+            Lex->create_info.options= $3;
+            Lex->ident= $4;
+            Lex->default_value= $6;
           }
         ;
 /*
@@ -12045,10 +12047,11 @@ drop:
             Lex->server_options.server_name= $4.str;
             Lex->server_options.server_name_length= $4.length;
           }
-        | DROP COMPRESSION_DICTIONARY_SYM ident
+        | DROP COMPRESSION_DICTIONARY_SYM if_exists ident
           {
             Lex->sql_command= SQLCOM_DROP_COMPRESSION_DICTIONARY;
-            Lex->ident= $3;
+            Lex->drop_if_exists= $3;
+            Lex->ident= $4;
           }
         ;
 

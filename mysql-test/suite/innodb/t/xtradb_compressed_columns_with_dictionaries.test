@@ -1,5 +1,23 @@
 --source include/have_innodb.inc
 
+# check if "IF [NOT] EXISTS" option works as expected for
+# "CREATE/DROP COMPRESSION_DICTIONARY ..."
+
+# creating a dictionary with a non-taken name must not be
+# affected by "IF NOT EXISTS" option
+CREATE COMPRESSION_DICTIONARY IF NOT EXISTS ddd('foo');
+# creating a dictionary with the same name and content
+# must generate a warning
+CREATE COMPRESSION_DICTIONARY IF NOT EXISTS ddd('foo');
+# creating a dictionary with the same name but different content
+# must generate a warning and leave content intact
+CREATE COMPRESSION_DICTIONARY IF NOT EXISTS ddd('bar');
+# dropping an existing dictionary must not be affected by
+# "IF EXISTS" option
+DROP COMPRESSION_DICTIONARY IF EXISTS ddd;
+# dropping a non-existing dictionary must generate a warning
+DROP COMPRESSION_DICTIONARY IF EXISTS ddd;
+
 # check if dictionary data supplied to "CREATE COMPRESSION_DICTIONARY ..."
 # statements is the same as in the information_schema (NUL characters
 # must not be ignored and must not be treated as string terminators)

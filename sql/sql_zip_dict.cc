@@ -30,6 +30,7 @@ Creates a new compression dictionary with the specified data.
 @param name_len                   compression dictionary name length
 @param data                       compression dictionary data
 @param data_len                   compression dictionary data length
+@param if_not_exists              "IF NOT EXISTS" flag
 
 @return Completion status
 @retval 0                                       Success
@@ -40,16 +41,18 @@ Creates a new compression dictionary with the specified data.
 @retval ER_READ_ONLY_MODE                       Forbidden in read-only mode
 @retval ER_UNKNOWN_ERROR                        Unknown error
 */
-int mysql_create_zip_dict(THD* thd, const char* name, ulong name_len, const char* data, ulong data_len)
+int mysql_create_zip_dict(THD* thd, const char* name, ulong name_len,
+  const char* data, ulong data_len, bool if_not_exists)
 {
-  int error= ER_UNKNOWN_ERROR;
+  int error= 0;
 
   DBUG_ENTER("mysql_create_zip_dict");
   handlerton *hton= ha_default_handlerton(thd);
 
   if (!hton->create_zip_dict)
   {
-    my_error(ER_ILLEGAL_HA_CREATE_OPTION, MYF(0),
+    error= ER_ILLEGAL_HA_CREATE_OPTION;
+    my_error(error, MYF(0),
       ha_resolve_storage_engine_name(hton), "COMPRESSED COLUMNS");
     DBUG_RETURN(error);
   }
@@ -57,7 +60,8 @@ int mysql_create_zip_dict(THD* thd, const char* name, ulong name_len, const char
   ulong local_name_len= name_len;
   ulong local_data_len= data_len;
   handler_create_zip_dict_result create_result=
-    hton->create_zip_dict(hton, thd, name, &local_name_len, data, &local_data_len);
+    hton->create_zip_dict(hton, thd, name, &local_name_len,
+                          data, &local_data_len);
   if (create_result != HA_CREATE_ZIP_DICT_OK)
   {
     switch (create_result)
@@ -71,8 +75,18 @@ int mysql_create_zip_dict(THD* thd, const char* name, ulong name_len, const char
         my_error(error, MYF(0), name, local_data_len);
         break;
       case HA_CREATE_ZIP_DICT_ALREADY_EXISTS:
-        error= ER_COMPRESSION_DICTIONARY_EXISTS;
-        my_error(error, MYF(0), name);
+        if (if_not_exists)
+        {
+          push_warning_printf(thd, Sql_condition::WARN_LEVEL_NOTE,
+                              ER_COMPRESSION_DICTIONARY_EXISTS,
+                              ER(ER_COMPRESSION_DICTIONARY_EXISTS),
+                              name);
+        }
+        else
+        {
+          error= ER_COMPRESSION_DICTIONARY_EXISTS;
+          my_error(error, MYF(0), name);
+        }
         break;
       case HA_CREATE_ZIP_DICT_READ_ONLY:
         error= ER_READ_ONLY_MODE;
@@ -83,10 +97,10 @@ int mysql_create_zip_dict(THD* thd, const char* name, ulong name_len, const char
         error= ER_UNKNOWN_ERROR;
         my_error(error, MYF(0));
     }
-    DBUG_RETURN(error);
   }
 
-  error= write_bin_log(thd, FALSE, thd->query(), thd->query_length());
+  if (error == 0)
+    error= write_bin_log(thd, FALSE, thd->query(), thd->query_length());
   DBUG_RETURN(error);
 }
 
@@ -96,6 +110,7 @@ Deletes a compression dictionary.
 @param thd                        thread descriptor.
 @param name                       compression dictionary name
 @param name_len                   compression dictionary name length
+@param if_exists                  "IF EXISTS" flag
 
 @return Completion status
 @retval 0                                        Success
@@ -105,16 +120,17 @@ Deletes a compression dictionary.
 @retval ER_READ_ONLY_MODE                        Forbidden in read-only mode
 @retval ER_UNKNOWN_ERROR                         Unknown error
 */
-int mysql_drop_zip_dict(THD* thd, const char* name, ulong name_len)
+int mysql_drop_zip_dict(THD* thd, const char* name, ulong name_len, bool if_exists)
 {
-  int error= ER_UNKNOWN_ERROR;
+  int error= 0;
 
   DBUG_ENTER("mysql_drop_zip_dict");
   handlerton *hton= ha_default_handlerton(thd);
 
   if (!hton->drop_zip_dict)
   {
-    my_error(ER_ILLEGAL_HA_CREATE_OPTION, MYF(0),
+    error= ER_ILLEGAL_HA_CREATE_OPTION;
+    my_error(error, MYF(0),
       ha_resolve_storage_engine_name(hton), "COMPRESSED COLUMNS");
     DBUG_RETURN(error);
   }
@@ -127,8 +143,18 @@ int mysql_drop_zip_dict(THD* thd, const char* name, ulong name_len)
     switch (drop_result)
     {
       case HA_DROP_ZIP_DICT_DOES_NOT_EXIST:
-        error= ER_COMPRESSION_DICTIONARY_DOES_NOT_EXIST;
-        my_error(error, MYF(0), name);
+        if (if_exists)
+        {
+          push_warning_printf(thd, Sql_condition::WARN_LEVEL_NOTE,
+                              ER_COMPRESSION_DICTIONARY_DOES_NOT_EXIST,
+                              ER(ER_COMPRESSION_DICTIONARY_DOES_NOT_EXIST),
+                              name);
+        }
+        else
+        {
+          error= ER_COMPRESSION_DICTIONARY_DOES_NOT_EXIST;
+          my_error(error, MYF(0), name);
+        }
         break;
       case HA_DROP_ZIP_DICT_IS_REFERENCED:
         error= ER_COMPRESSION_DICTIONARY_IS_REFERENCED;
@@ -143,9 +169,9 @@ int mysql_drop_zip_dict(THD* thd, const char* name, ulong name_len)
         error= ER_UNKNOWN_ERROR;
         my_error(error, MYF(0));
     }
-    DBUG_RETURN(error);
   }
 
-  error= write_bin_log(thd, FALSE, thd->query(), thd->query_length());
+  if (error == 0)
+    error= write_bin_log(thd, FALSE, thd->query(), thd->query_length());
   DBUG_RETURN(error);
 }

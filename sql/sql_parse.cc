@@ -4336,13 +4336,15 @@ end_with_restore_list:
     }
 
     if ((res= mysql_create_zip_dict(thd, lex->ident.str, lex->ident.length,
-          dict_data_ptr->ptr(), dict_data_ptr->length())) == 0)
+          dict_data_ptr->ptr(), dict_data_ptr->length(),
+         (lex->create_info.options & HA_LEX_CREATE_IF_NOT_EXISTS) != 0)) == 0)
       my_ok(thd);
     break;
   }
   case SQLCOM_DROP_COMPRESSION_DICTIONARY:
   {
-    if ((res= mysql_drop_zip_dict(thd, lex->ident.str, lex->ident.length)) == 0)
+    if ((res= mysql_drop_zip_dict(thd, lex->ident.str, lex->ident.length,
+                                  lex->drop_if_exists)) == 0)
       my_ok(thd);
     break;
   }

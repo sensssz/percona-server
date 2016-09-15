@@ -31,6 +31,7 @@ class THD;
   @param name_len                   compression dictionary name length
   @param data                       compression dictionary data
   @param data_len                   compression dictionary data length
+  @param if_not_exists              "IF NOT EXISTS" flag
 
   @return Completion status
     @retval 0                                       Success
@@ -42,7 +43,7 @@ class THD;
     @retval ER_UNKNOWN_ERROR                        Unknown error
 */
 int mysql_create_zip_dict(THD* thd, const char* name, ulong name_len,
-  const char* data, ulong data_len);
+  const char* data, ulong data_len, bool if_not_exists);
 
 /**
   Deletes a compression dictionary.
@@ -50,6 +51,7 @@ int mysql_create_zip_dict(THD* thd, const char* name, ulong name_len,
   @param thd                        thread descriptor.
   @param name                       compression dictionary name
   @param name_len                   compression dictionary name length
+  @param if_exists                  "IF EXISTS" flag
 
   @return Completion status
     @retval 0                                        Success
@@ -59,6 +61,6 @@ int mysql_create_zip_dict(THD* thd, const char* name, ulong name_len,
     @retval ER_READ_ONLY_MODE                        Forbidden in read-only mode
     @retval ER_UNKNOWN_ERROR                         Unknown error
 */
-int mysql_drop_zip_dict(THD* thd, const char* name, ulong name_len);
+int mysql_drop_zip_dict(THD* thd, const char* name, ulong name_len, bool if_exists);
 
 #endif /* SQL_ZIP_DICT_INCLUDED */
