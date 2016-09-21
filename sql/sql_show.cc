@@ -56,6 +56,7 @@
 #include "sql_tmp_table.h" // Tmp tables
 #include "sql_optimizer.h" // JOIN
 #include "global_threads.h"
+#include "my_default.h"
 
 #include <algorithm>
 using std::max;
@@ -1542,11 +1543,14 @@ int store_create_info(THD *thd, TABLE_LIST *table_list, String *packet,
       packet->append(STRING_WITH_LEN(" /*!50606 COLUMN_FORMAT DYNAMIC */"));
       break;
     case COLUMN_FORMAT_TYPE_COMPRESSED:
-      packet->append(STRING_WITH_LEN(" /*!50632 COLUMN_FORMAT COMPRESSED"));
+      packet->append(STRING_WITH_LEN(" /*!"
+        STRINGIFY_ARG(FIRST_SUPPORTED_COMPRESSED_COLUMNS_VERSION)
+        " COLUMN_FORMAT COMPRESSED"));
       if (field->has_associated_compression_dictionary())
       {
         packet->append(STRING_WITH_LEN(" WITH COMPRESSION_DICTIONARY "));
-        packet->append(field->zip_dict_name.str, field->zip_dict_name.length);
+        append_identifier(thd, packet, field->zip_dict_name.str,
+                          field->zip_dict_name.length);
       }
       packet->append(STRING_WITH_LEN(" */"));
       break;
