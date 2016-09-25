@@ -78,7 +78,7 @@ byte*
 row_compress_column(
 	const byte*	data,		/*!< in: data in mysql(uncompressed) format */
 	ulint		*len,		/*!< in: data length; out: length of compressed data*/
-	ulint		lenlen,		/*!< in: bytes used to store the lenght of data*/
+	ulint		lenlen,		/*!< in: bytes used to store the length of data*/
 	const byte*	dict_data,	/*!< in: optional dictionary data used for compression */
 	ulint		dict_data_len,	/*!< in: optional dictionary data length */
 	row_prebuilt_t*	prebuilt);	/*!< in: use prebuilt->compress_heap only here*/

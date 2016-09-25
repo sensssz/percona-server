@@ -282,6 +282,4 @@
 #define QUERY_PRIOR	6
 #endif /* __WIN92__ */
 
-#define COMPRESSED_COLUMN_HEADER_LENGTH 2
-
 #endif /* SQL_CONST_INCLUDED */

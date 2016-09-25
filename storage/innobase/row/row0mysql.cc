@@ -311,8 +311,8 @@ static const bool default_zip_column_reserved_value = false;
 */
 static const uint default_zip_column_algorithm_value = 0;
 
-static const size_t zip_column_prefix_max_length = COMPRESSED_COLUMN_HEADER_LENGTH + 8;
-static const size_t zip_column_header_length = COMPRESSED_COLUMN_HEADER_LENGTH;
+static const size_t zip_column_prefix_max_length = 10;
+static const size_t zip_column_header_length = 2;
 
 /* 'reserved', bit 0 */
 static const uint zip_column_reserved = 0;
@@ -424,7 +424,7 @@ byte*
 row_compress_column(
 	const byte*	data,		/*!< in: data in mysql(uncompressed) format */
 	ulint*		len,		/*!< in: data length; out: length of compressed data*/
-	ulint		lenlen,		/*!< in: bytes used to store the lenght of data*/
+	ulint		lenlen,		/*!< in: bytes used to store the length of data*/
 	const byte*	dict_data,	/*!< in: optional dictionary data used for compression */
 	ulint		dict_data_len,	/*!< in: optional dictionary data length */
 	row_prebuilt_t*	prebuilt)	/*!< in: use prebuilt->compress_heap only here*/
@@ -491,7 +491,7 @@ row_compress_column(
 		ib_logf(IB_LOG_LEVEL_ERROR, "failed to compress the column, error: %d\n", err);
 	}
 
-	/* make sure the compressed data size is smaller than uncmpressed data*/
+	/* make sure the compressed data size is smaller than uncompressed data*/
 	if (err == Z_OK && *len > (comp_len + zip_column_header_length + lenlen))
 	{
 		column_set_compress_header(buf, true, lenlen - 1,
@@ -695,9 +695,9 @@ row_mysql_store_blob_ref(
 	In 32-bit architectures we only use the first 4 bytes of the pointer
 	slot. */
 
-	ut_a(col_len - 8 > 1 || len < 256);
-	ut_a(col_len - 8 > 2 || len < 256 * 256);
-	ut_a(col_len - 8 > 3 || len < 256 * 256 * 256);
+	ut_a(col_len - 8 > 1 || len < 256 + 2);
+	ut_a(col_len - 8 > 2 || len < 256 * 256 + 2);
+	ut_a(col_len - 8 > 3 || len < 256 * 256 * 256 + 2);
 
 	const byte *ptr = NULL;
 

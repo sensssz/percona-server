@@ -841,8 +841,10 @@ rec_get_converted_size_comp_prefix_low(
 			continue;
 		}
 
-		ut_ad(len <= col->len || col->mtype == DATA_BLOB
-		      || (col->len == 0 && col->mtype == DATA_VARCHAR));
+		ut_ad(len <= col->len || col->mtype == DATA_BLOB ||
+		  ((col->mtype == DATA_VARCHAR || col->mtype == DATA_BINARY
+		   || col->mtype == DATA_VARMYSQL)
+		   && (col->len == 0 || len <= (col->len + 2U))));
 
 		fixed_len = field->fixed_len;
 		if (temp && fixed_len
@@ -1269,7 +1271,7 @@ rec_convert_dtuple_to_rec_comp(
 			*lens-- = (byte) (len >> 8) | 0xc0;
 			*lens-- = (byte) len;
 		} else {
-			ut_ad(len <= dtype_get_len(type)
+			ut_ad(len <= dtype_get_len(type) + 2U
 			      || dtype_get_mtype(type) == DATA_BLOB
 			      || !strcmp(index->name,
 					 FTS_INDEX_TABLE_IND_NAME));

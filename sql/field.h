@@ -3250,14 +3250,10 @@ public:
   bool zero_pack() const { return 0; }
   type_conversion_status reset(void)
   {
-    memset(ptr, 0, pack_length());
+    memset(ptr, 0, field_length+length_bytes);
     return TYPE_OK;
   }
-  uint32 pack_length() const
-  {
-    return (uint32) field_length + length_bytes +
-      (column_format() == COLUMN_FORMAT_TYPE_COMPRESSED ? COMPRESSED_COLUMN_HEADER_LENGTH : 0);
-  }
+  uint32 pack_length() const { return (uint32) field_length+length_bytes; }
   uint32 key_length() const { return (uint32) field_length; }
   uint32 sort_length() const
   {
@@ -3970,7 +3966,7 @@ Field *make_field(TABLE_SHARE *share, uchar *ptr, uint32 field_length,
 		  TYPELIB *interval, const char *field_name);
 uint pack_length_to_packflag(uint type);
 enum_field_types get_blob_type_from_length(ulong length);
-uint32 calc_pack_length(enum_field_types type,uint32 length, bool compressed);
+uint32 calc_pack_length(enum_field_types type,uint32 length);
 type_conversion_status set_field_to_null(Field *field);
 type_conversion_status set_field_to_null_with_conversions(Field *field,
                                                           bool no_conversions);

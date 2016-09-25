@@ -9580,8 +9580,7 @@ void Create_field::create_length_to_internal_length(void)
   case MYSQL_TYPE_VARCHAR:
     length*= charset->mbmaxlen;
     key_length= length;
-    pack_length= calc_pack_length(sql_type, length,
-      column_format() == COLUMN_FORMAT_TYPE_COMPRESSED);
+    pack_length= calc_pack_length(sql_type, length);
     break;
   case MYSQL_TYPE_ENUM:
   case MYSQL_TYPE_SET:
@@ -9610,8 +9609,7 @@ void Create_field::create_length_to_internal_length(void)
 				 decimals);
     break;
   default:
-    key_length= pack_length= calc_pack_length(sql_type, length,
-      column_format() == COLUMN_FORMAT_TYPE_COMPRESSED);
+    key_length= pack_length= calc_pack_length(sql_type, length);
     break;
   }
 }
@@ -10142,14 +10140,13 @@ enum_field_types get_blob_type_from_length(ulong length)
   Make a field from the .frm file info
 */
 
-uint32 calc_pack_length(enum_field_types type,uint32 length, bool compressed)
+uint32 calc_pack_length(enum_field_types type,uint32 length)
 {
   switch (type) {
   case MYSQL_TYPE_VAR_STRING:
   case MYSQL_TYPE_STRING:
   case MYSQL_TYPE_DECIMAL:     return (length);
-  case MYSQL_TYPE_VARCHAR:
-    return (length + (length < 256 ? 1: 2) + (compressed ? COMPRESSED_COLUMN_HEADER_LENGTH : 0));
+  case MYSQL_TYPE_VARCHAR:     return (length + (length < 256 ? 1: 2));
   case MYSQL_TYPE_YEAR:
   case MYSQL_TYPE_TINY	: return 1;
   case MYSQL_TYPE_SHORT : return 2;
@@ -10266,10 +10263,9 @@ Field *make_field(TABLE_SHARE *share, uchar *ptr, uint32 field_length,
       return 0;                                 // Error
     }
 
-    /* false is OK here as it is meaningful only for VARCHARs */
     uint pack_length=calc_pack_length((enum_field_types)
 				      f_packtype(pack_flag),
-				      field_length, false);
+				      field_length);
 
 #ifdef HAVE_SPATIAL
     if (f_is_geom(pack_flag))

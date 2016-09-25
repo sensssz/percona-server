@@ -3118,8 +3118,7 @@ int prepare_create_field(Create_field *sql_field,
       /* convert VARCHAR to CHAR because handler is not yet up to date */
       sql_field->sql_type=    MYSQL_TYPE_VAR_STRING;
       sql_field->pack_length= calc_pack_length(sql_field->sql_type,
-        (uint) sql_field->length,
-        sql_field->column_format() == COLUMN_FORMAT_TYPE_COMPRESSED);
+                                               (uint) sql_field->length);
       if ((sql_field->length / sql_field->charset->mbmaxlen) >
           MAX_FIELD_CHARLENGTH)
       {
@@ -4669,8 +4668,7 @@ static bool prepare_blob_field(THD *thd, Create_field *sql_field)
     {
       /* The user has given a length to the blob column */
       sql_field->sql_type= get_blob_type_from_length(sql_field->length);
-      sql_field->pack_length= calc_pack_length(sql_field->sql_type, 0,
-        sql_field->column_format() == COLUMN_FORMAT_TYPE_COMPRESSED);
+      sql_field->pack_length= calc_pack_length(sql_field->sql_type, 0);
     }
     sql_field->length= 0;
   }
