@@ -552,6 +552,9 @@ row_decompress_column(
 	ulint lenlen = 0;
 	uint alg = 0;
 
+	ut_ad(*len != ULINT_UNDEFINED);
+	ut_ad(*len > zip_column_header_length);
+
 	column_get_compress_header(data, &is_compressed, &lenlen, &alg, &wrap,
 		&reserved);
 
@@ -640,6 +643,9 @@ row_decompress_column(
 	case Z_OK:
 		break;
 	case Z_BUF_ERROR:
+		// TODO: treat as a tablespace corruption, or a corrupted
+		// record, similar to how non-compression code handles such
+		// situations
 		ib_logf(IB_LOG_LEVEL_ERROR, "zlib buf error, this shouldn't happen\n");
 		break;
 	default:
@@ -657,6 +663,7 @@ row_decompress_column(
 		return buf;
 	}
 
+	// TODO: error logged twice
 	ib_logf(IB_LOG_LEVEL_ERROR, "failed to decompress column, this shouldn't happen!\n");
 	*len -= (zip_column_header_length + lenlen);
 	return data;
