@@ -1572,17 +1572,7 @@ RecLock::lock_add(lock_t* lock, bool add_to_hash)
 
 		++lock->index->table->n_rec_locks;
 
-		if (innodb_lock_schedule_algorithm
-		    == INNODB_LOCK_SCHEDULE_ALGORITHM_VATS) {
-
-			// TODO VATS
-			ut_ad(!(m_mode & LOCK_PREDICATE));
-			ut_ad(!(m_mode & LOCK_PRDT_PAGE));
-			lock_rec_insert_by_trx_age(lock, lock->is_waiting());
-		} else {
-			HASH_INSERT(lock_t, hash, lock_hash_get(m_mode), key,
-				    lock);
-		}
+		HASH_INSERT(lock_t, hash, lock_hash_get(m_mode), key, lock);
 	}
 
 	if (m_mode & LOCK_WAIT) {
@@ -1665,6 +1655,24 @@ RecLock::check_deadlock_result(const trx_t* victim_trx, lock_t* lock)
 
 		return(DB_SUCCESS_LOCKED_REC);
 	}
+
+	// Move it only when it does not cause a deadlock.
+	if (innodb_lock_schedule_algorithm
+	    == INNODB_LOCK_SCHEDULE_ALGORITHM_VATS) {
+
+		// TODO VATS
+		ut_ad(!(m_mode & LOCK_PREDICATE));
+		ut_ad(!(m_mode & LOCK_PRDT_PAGE));
+		ut_ad(lock_hash_get(lock->type_mode) == lock_sys->rec_hash);
+
+		const ulint space = lock->un_member.rec_lock.space;
+		const ulint page_no = lock->un_member.rec_lock.page_no;
+
+		HASH_DELETE(lock_t, hash, lock_sys->rec_hash,
+			    lock_rec_fold(space, page_no), lock);
+		lock_rec_insert_by_trx_age(lock, true);
+	}
+
 
 	return(DB_LOCK_WAIT);
 }
@@ -7390,7 +7398,9 @@ DeadlockChecker::get_first_lock(ulint* heap_no) const
 	/* Must find at least two locks, otherwise there cannot be a
 	waiting lock, secondly the first lock cannot be the wait_lock. */
 	ut_a(lock != NULL);
-	ut_a(lock != m_wait_lock);
+	ut_a(lock != m_wait_lock ||
+	     (innodb_lock_schedule_algorithm
+	      == INNODB_LOCK_SCHEDULE_ALGORITHM_VATS));
 
 	/* Check that the lock type doesn't change. */
 	ut_ad(lock_get_type_low(lock) == lock_get_type_low(m_wait_lock));
