@@ -1665,7 +1665,7 @@ RecLock::check_deadlock_result(const trx_t* victim_trx, lock_t* lock)
 		// TODO VATS
 		ut_ad(!(m_mode & LOCK_PREDICATE));
 		ut_ad(!(m_mode & LOCK_PRDT_PAGE));
-		ut_ad(lock_hash_get(lock->type_mode) == lock_sys->rec_hash);
+//		ut_ad(lock_hash_get(lock->type_mode) == lock_sys->rec_hash);
 
 		const ulint space = lock->un_member.rec_lock.space;
 		const ulint page_no = lock->un_member.rec_lock.page_no;
@@ -2614,7 +2614,7 @@ lock_rec_dequeue_from_page(
 		}
 	} else {
 		// TODO VATS
-		ut_ad(lock_hash == lock_sys->rec_hash);
+//		ut_ad(lock_hash == lock_sys->rec_hash);
 		/* Grant locks if there are no conflicting locks ahead.
 		Move granted locks to the head of the list. */
 		for (lock = lock_rec_get_first_on_page_addr(lock_hash, space,
