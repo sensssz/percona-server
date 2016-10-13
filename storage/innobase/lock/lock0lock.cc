@@ -55,7 +55,7 @@ Created 5/7/1996 Heikki Tuuri
 my_bool	innobase_deadlock_detect = TRUE;
 
 /** Lock scheduling algorithm */
-ulong innodb_lock_schedule_algorithm = INNODB_LOCK_SCHEDULE_ALGORITHM_FCFS;
+ulong innodb_lock_schedule_algorithm = INNODB_LOCK_SCHEDULE_ALGORITHM_VATS;
 
 /** Total number of cached record locks */
 static const ulint	REC_LOCK_CACHE = 8;
@@ -5639,8 +5639,13 @@ lock_rec_queue_validate(
 					lock->trx);
 			ut_a(!other_lock);
 
-		} else if (lock_get_wait(lock) && !lock_rec_get_gap(lock)) {
+		} else if (lock_get_wait(lock) && !lock_rec_get_gap(lock)
+			   && (innodb_lock_schedule_algorithm
+			       == INNODB_LOCK_SCHEDULE_ALGORITHM_FCFS)) {
 
+			// If using VATS, it's possible that a wait lock is
+			// inserted to a place in the list such that it does
+			// not need to wait.
 			ut_a(lock_rec_has_to_wait_in_queue(lock));
 		}
 	}
