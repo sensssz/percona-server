@@ -1528,18 +1528,20 @@ lock_rec_insert_by_trx_age(
 	lock_t *in_lock, /*!< in: lock to be insert */
 	bool wait)	 /*!< in: whether it's a wait lock */
 {
-	ulint					space;
-	ulint					page_no;
-	ulint					rec_fold;
-	hash_cell_t*	cell;
+	ulint				space;
+	ulint				page_no;
+	ulint				rec_fold;
+    hash_table_t*       hash;
+	hash_cell_t*        cell;
 	lock_t*				node;
 	lock_t*				next;
 
 	space = in_lock->un_member.rec_lock.space;
 	page_no = in_lock->un_member.rec_lock.page_no;
 	rec_fold = lock_rec_fold(space, page_no);
-	cell = hash_get_nth_cell(lock_sys->rec_hash,
-				 hash_calc_hash(rec_fold, lock_sys->rec_hash));
+    hash = lock_hash_get(in_lock->type_mode);
+	cell = hash_get_nth_cell(hash,
+				 hash_calc_hash(rec_fold, hash));
 
 	node = (lock_t *) cell->node;
 	// If in_lock is not a wait lock, we insert it to the head of the list.
@@ -1591,9 +1593,9 @@ Create a new lock.
 @return a new lock instance */
 lock_t*
 RecLock::create(
-	trx_t*	trx,
-	bool	owns_trx_mutex,
-	bool	add_to_hash,
+	trx_t*  trx,
+	bool		owns_trx_mutex,
+	bool		add_to_hash,
 	const	lock_prdt_t* prdt)
 {
 	ut_ad(lock_mutex_own());
@@ -1668,7 +1670,7 @@ RecLock::check_deadlock_result(const trx_t* victim_trx, lock_t* lock)
 		const ulint space = lock->un_member.rec_lock.space;
 		const ulint page_no = lock->un_member.rec_lock.page_no;
 
-		HASH_DELETE(lock_t, hash, lock_sys->rec_hash,
+		HASH_DELETE(lock_t, hash, lock_hash_get(lock->type_mode),
 			    lock_rec_fold(space, page_no), lock);
 		lock_rec_insert_by_trx_age(lock, true);
 	}
@@ -2527,14 +2529,18 @@ lock_rec_move_to_front(
 	lock_t *lock_to_move,	/*!< in: lock to be moved */
 	ulint rec_fold)			 /*!< in: rec fold of the lock */
 {
+    hash_table_t*	lock_hash;
+    hash_cell_t*    cell;
+    lock_t*         next;
+    
 	if (lock_to_move != NULL)
 	{
+        lock_hash = lock_hash_get(lock_to_move->type_mode);
 		// Move the target lock to the head of the list
-		hash_cell_t* cell = hash_get_nth_cell(lock_sys->rec_hash,
-						      hash_calc_hash(rec_fold,
-								     lock_sys->rec_hash));
+		cell = hash_get_nth_cell(lock_hash,
+                hash_calc_hash(rec_fold, lock_hash));
 		if (lock_to_move != cell->node) {
-			lock_t *next = (lock_t *) cell->node;
+			next = (lock_t *) cell->node;
 			cell->node = lock_to_move;
 			lock_to_move->hash = next;
 		}
