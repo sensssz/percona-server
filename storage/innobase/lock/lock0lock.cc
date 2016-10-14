@@ -1508,6 +1508,12 @@ has_higher_priority(
 	} else if (lock2 == NULL) {
 		return true;
 	}
+    if (trx_is_high_priority(lock1->trx)) {
+        return true;
+    }
+    if (trx_is_high_priority(lock2->trx)) {
+        return false;
+    }
 	if (!lock_get_wait(lock1)) {
 		return true;
 	} else if (!lock_get_wait(lock2)) {
@@ -1574,7 +1580,19 @@ RecLock::lock_add(lock_t* lock, bool add_to_hash)
 
 		++lock->index->table->n_rec_locks;
 
-		HASH_INSERT(lock_t, hash, lock_hash_get(m_mode), key, lock);
+        
+        // Move it only when it does not cause a deadlock.
+        if (innodb_lock_schedule_algorithm
+            == INNODB_LOCK_SCHEDULE_ALGORITHM_VATS) {
+
+            // TODO VATS
+//            ut_ad(!(m_mode & LOCK_PREDICATE));
+//            ut_ad(!(m_mode & LOCK_PRDT_PAGE));
+            
+            lock_rec_insert_by_trx_age(lock, m_mode & LOCK_WAIT);
+        } else {
+            HASH_INSERT(lock_t, hash, lock_hash_get(m_mode), key, lock);
+        }
 	}
 
 	if (m_mode & LOCK_WAIT) {
@@ -1656,23 +1674,6 @@ RecLock::check_deadlock_result(const trx_t* victim_trx, lock_t* lock)
 		already have the lock now granted! */
 
 		return(DB_SUCCESS_LOCKED_REC);
-	}
-
-	// Move it only when it does not cause a deadlock.
-	if (innodb_lock_schedule_algorithm
-	    == INNODB_LOCK_SCHEDULE_ALGORITHM_VATS) {
-
-		// TODO VATS
-		ut_ad(!(m_mode & LOCK_PREDICATE));
-		ut_ad(!(m_mode & LOCK_PRDT_PAGE));
-//		ut_ad(lock_hash_get(lock->type_mode) == lock_sys->rec_hash);
-
-		const ulint space = lock->un_member.rec_lock.space;
-		const ulint page_no = lock->un_member.rec_lock.page_no;
-
-		HASH_DELETE(lock_t, hash, lock_hash_get(lock->type_mode),
-			    lock_rec_fold(space, page_no), lock);
-		lock_rec_insert_by_trx_age(lock, true);
 	}
 
 
@@ -1823,6 +1824,10 @@ RecLock::add_to_waitq(const lock_t* wait_for, const lock_prdt_t* prdt)
 		/* Lock is granted */
 		return(DB_SUCCESS);
 	}
+    if (!lock_rec_has_to_wait_in_queue(lock)) {
+        lock_reset_lock_and_trx_wait(lock);
+        return DB_SUCCESS;
+    }
 
 	ut_ad(lock_get_wait(lock));
 
@@ -5577,7 +5582,9 @@ lock_rec_queue_validate(
 
 			ut_ad(!trx_is_ac_nl_ro(lock->trx));
 
-			if (lock_get_wait(lock)) {
+			if (lock_get_wait(lock)
+                && (innodb_lock_schedule_algorithm
+                    == INNODB_LOCK_SCHEDULE_ALGORITHM_FCFS)) {
 				ut_a(lock_rec_has_to_wait_in_queue(lock));
 			}
 
