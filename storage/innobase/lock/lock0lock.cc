@@ -69,6 +69,15 @@ static const ulint	TABLE_LOCK_CACHE = 8;
 /** Size in bytes, of the table lock instance */
 static const ulint	TABLE_LOCK_SIZE = sizeof(ib_lock_t);
 
+/*********************************************************************//**
+Checks if a waiting record lock request still has to wait in a queue.
+@return lock that is causing the wait */
+static
+const lock_t*
+lock_rec_has_to_wait_in_queue(
+/*==========================*/
+  const lock_t*	wait_lock);	/*!< in: waiting record lock */
+
 /** Deadlock checker. */
 class DeadlockChecker {
 public:
