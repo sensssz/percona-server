@@ -27,6 +27,7 @@ Created 5/7/1996 Heikki Tuuri
 
 #include <mysql/service_thd_engine_lock.h>
 #include "ha_prototypes.h"
+#include "ha_innodb.h"
 
 #include "lock0lock.h"
 #include "lock0priv.h"
@@ -1518,6 +1519,11 @@ has_higher_priority(
 	} else if (lock2 == NULL) {
 		return true;
 	}
+    // Account for slave replication commit order
+    int preference = thd_priority_preference(lock1->trx->mysql_thd, lock2->trx->mysql_thd);
+    if (preference != 0) {
+        return preference == -1? true : false;
+    }
     if (trx_is_high_priority(lock1->trx)) {
         return true;
     }
