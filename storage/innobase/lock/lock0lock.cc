@@ -1544,13 +1544,17 @@ lock_rec_insert_by_trx_age(
 	lock_t *in_lock, /*!< in: lock to be insert */
 	bool wait)	 /*!< in: whether it's a wait lock */
 {
+    ulint               space;
+    ulint               page_no;
 	ulint				rec_fold;
     hash_table_t*       hash;
 	hash_cell_t*        cell;
 	lock_t*				node;
 	lock_t*				next;
 
-	rec_fold = m_rec_id.fold();
+    space = in_lock->un_member.rec_lock.space;
+    page_no = in_lock->un_member.rec_lock.page_no;
+	rec_fold = lock_rec_fold(space, page_no);
     hash = lock_hash_get(in_lock->type_mode);
 	cell = hash_get_nth_cell(hash,
 				 hash_calc_hash(rec_fold, hash));
