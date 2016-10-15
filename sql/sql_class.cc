@@ -4094,7 +4094,7 @@ extern "C" int thd_non_transactional_update(const MYSQL_THD thd)
     Transaction_ctx::SESSION);
 }
 
-extern "C" int thd_priority_preference(const MYSQL_THD thd1, const MYSQL_THD thd2) {
+extern "C" int thd_priority_preference(MYSQL_THD thd1, MYSQL_THD thd2) {
     return commit_order_manager_priority_preference(thd1, thd2);
 }
 

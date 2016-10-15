@@ -24,7 +24,6 @@ Created 5/7/1996 Heikki Tuuri
 *******************************************************/
 
 #define LOCK_MODULE_IMPLEMENTATION
-#define INNODB_COMPATIBILITY_HOOKS
 
 #include <sql_class.h>
 #include <mysql/service_thd_engine_lock.h>

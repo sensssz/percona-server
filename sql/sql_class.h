@@ -96,7 +96,7 @@ void set_thd_stage_info(void *thd,
  @retval 1 if thd2 is preferred (should commit first)
  @retval 0 if no preference */
 extern "C"
-int thd_priority_preference(const MYSQL_THD thd1, const MYSQL_THD thd2);
+int thd_priority_preference(MYSQL_THD thd1, MYSQL_THD thd2);
 
 enum enum_delay_key_write { DELAY_KEY_WRITE_NONE, DELAY_KEY_WRITE_ON,
 			    DELAY_KEY_WRITE_ALL };
