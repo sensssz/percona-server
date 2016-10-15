@@ -219,8 +219,8 @@ inline void commit_order_manager_check_deadlock(THD* thd_self,
         @retval 1       thd2 has higher priority
         @retval 0       No preference
  */
-inline int commit_order_manager_priority_preference(THD* thd1,
-                                                    THD *thd2)
+inline int commit_order_manager_priority_preference(const THD *thd1,
+                                                    const THD *thd2)
 {
     DBUG_ENTER("commit_order_manager_priority_preference");
     

@@ -535,14 +535,6 @@ int thd_slave_thread(const MYSQL_THD thd);
 @retval 1 the user thread is running a non-transactional update */
 int thd_non_transactional_update(const MYSQL_THD thd);
 
-/** Check if there is any preference on the order of 2 transactions.
- One of them is preferred is both are slaves executing in-order replication.
- @param thds associated with 2 transactions.
- @retval -1 if thd1 is preferred (should commit first)
- @retval 1 if thd2 is preferred (should commit first)
- @retval 0 if no preference */
-int thd_priority_preference(const MYSQL_THD thd1, const MYSQL_THD thd2);
-
 /** Get the user thread's binary logging format
 @param thd user thread
 @return Value to be used as index into the binlog_format_names array */
