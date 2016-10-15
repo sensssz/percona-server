@@ -209,5 +209,39 @@ inline void commit_order_manager_check_deadlock(THD* thd_self,
   DBUG_VOID_RETURN;
 }
 
+/*
+    Check if the commit order manager has preference on the priority
+    of the two transactions.
+    @param[in] thd1     The first transaction
+    @param[in] thd2     The second transaction
+    @retrun
+        @retval -1      thd1 has higher priority
+        @retval 1       thd2 has higher priority
+        @retval 0       No preference
+ */
+inline int commit_order_manager_priority_preference(THD* thd1,
+                                                    THD *thd2)
+{
+    DBUG_ENTER("commit_order_manager_priority_preference");
+    
+    Slave_worker *worker1= get_thd_worker(thd1);
+    Slave_worker *worker2= get_thd_worker(thd2);
+    Commit_order_manager *mngr= self_w->get_commit_order_manager();
+    
+    /* Check if both workers are working for the same channel */
+    if (mngr != NULL && worker1->c_rli == worker2->c_rli)
+    {
+        if (worker1->sequence_number() < worker2->sequence_number()) {
+            /* thd1 should commit first, and thus has higher priority */
+            return -1;
+        } else {
+            /* thd2 should commit first, and thus has higher priority */
+            return 1;
+        }
+    }
+    /* Not working for the the same channel */
+    return 0;
+}
+
 #endif //HAVE_REPLICATION
 #endif /*RPL_SLAVE_COMMIT_ORDER_MANAGER*/

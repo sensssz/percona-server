@@ -35,6 +35,7 @@
 #include "parse_tree_nodes.h"                // PT_select_var
 #include "rpl_filter.h"                      // binlog_filter
 #include "rpl_rli.h"                         // Relay_log_info
+#include "rpl_gtid.h"                        // Gtid
 #include "sp_cache.h"                        // sp_cache_clear
 #include "sp_rcontext.h"                     // sp_rcontext
 #include "sql_audit.h"                       // mysql_audit_release
@@ -4091,6 +4092,10 @@ extern "C" int thd_non_transactional_update(const MYSQL_THD thd)
 {
   return thd->get_transaction()->has_modified_non_trans_table(
     Transaction_ctx::SESSION);
+}
+
+extern "C" int thd_priority_preference(const MYSQL_THD thd1, const MYSQL_THD thd2) {
+    return commit_order_manager_priority_preference(thd1, thd2);
 }
 
 extern "C" int thd_binlog_format(const MYSQL_THD thd)

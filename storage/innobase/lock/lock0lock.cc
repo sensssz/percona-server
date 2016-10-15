@@ -27,6 +27,7 @@ Created 5/7/1996 Heikki Tuuri
 
 #include <mysql/service_thd_engine_lock.h>
 #include "ha_prototypes.h"
+#include "ha_innodb.h"
 
 #include "lock0lock.h"
 #include "lock0priv.h"
