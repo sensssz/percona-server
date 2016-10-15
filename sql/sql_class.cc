@@ -4094,9 +4094,15 @@ extern "C" int thd_non_transactional_update(const MYSQL_THD thd)
     Transaction_ctx::SESSION);
 }
 
+#ifndef EMBEDDED_LIBRARY
 extern "C" int thd_priority_preference(MYSQL_THD thd1, MYSQL_THD thd2) {
     return commit_order_manager_priority_preference(thd1, thd2);
 }
+#else
+extern "C" int thd_priority_preference(MYSQL_THD thd1, MYSQL_THD thd2) {
+    return 0;
+}
+#endif
 
 extern "C" int thd_binlog_format(const MYSQL_THD thd)
 {

@@ -226,17 +226,19 @@ inline int commit_order_manager_priority_preference(THD *thd1,
     
     Slave_worker *worker1= get_thd_worker(thd1);
     Slave_worker *worker2= get_thd_worker(thd2);
-    Commit_order_manager *mngr= worker1->get_commit_order_manager();
     
-    /* Check if both workers are working for the same channel */
-    if (mngr != NULL && worker1->c_rli == worker2->c_rli)
-    {
-        if (worker1->sequence_number() < worker2->sequence_number()) {
-            /* thd1 should commit first, and thus has higher priority */
-            return -1;
-        } else {
-            /* thd2 should commit first, and thus has higher priority */
-            return 1;
+    if (worker1 != NULL && worker2 != NULL) {
+        Commit_order_manager *mngr= worker1->get_commit_order_manager();
+        /* Check if both workers are working for the same channel */
+        if (mngr != NULL && worker1->c_rli == worker2->c_rli)
+        {
+            if (worker1->sequence_number() < worker2->sequence_number()) {
+                /* thd1 should commit first, and thus has higher priority */
+                return -1;
+            } else {
+                /* thd2 should commit first, and thus has higher priority */
+                return 1;
+            }
         }
     }
     /* Not working for the the same channel */
