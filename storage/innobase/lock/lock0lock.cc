@@ -1503,6 +1503,7 @@ RecLock::lock_alloc(
 /*********************************************************************//**
 Check if lock1 has higher priority than lock2.
 NULL has lowest priority.
+If either is a high priority transaction, the lock has higher priority.
 If neither of them is wait lock, the first one has higher priority.
 If only one of them is a wait lock, it has lower priority.
 Otherwise, the one with an older transaction has higher priority.
@@ -1537,17 +1538,13 @@ lock_rec_insert_by_trx_age(
 	lock_t *in_lock, /*!< in: lock to be insert */
 	bool wait)	 /*!< in: whether it's a wait lock */
 {
-	ulint				space;
-	ulint				page_no;
 	ulint				rec_fold;
     hash_table_t*       hash;
 	hash_cell_t*        cell;
 	lock_t*				node;
 	lock_t*				next;
 
-	space = in_lock->un_member.rec_lock.space;
-	page_no = in_lock->un_member.rec_lock.page_no;
-	rec_fold = lock_rec_fold(space, page_no);
+	rec_fold = m_rec_id.fold();
     hash = lock_hash_get(in_lock->type_mode);
 	cell = hash_get_nth_cell(hash,
 				 hash_calc_hash(rec_fold, hash));
@@ -1565,7 +1562,7 @@ lock_rec_insert_by_trx_age(
 	}
 	next = (lock_t *) node->hash;
 	node->hash = in_lock;
-	in_lock->hash = next;
+    in_lock->hash = next;
 }
 
 /**
@@ -1658,14 +1655,20 @@ RecLock::check_deadlock_result(const trx_t* victim_trx, lock_t* lock)
 
 		return(DB_DEADLOCK);
 
-	} else if (m_trx->lock.wait_lock == NULL) {
-
-		/* If there was a deadlock but we chose another
-		transaction as a victim, it is possible that we
-		already have the lock now granted! */
-
-		return(DB_SUCCESS_LOCKED_REC);
 	}
+    
+    // Move it only when it does not cause a deadlock.
+    if (innodb_lock_schedule_algorithm
+        == INNODB_LOCK_SCHEDULE_ALGORITHM_VATS) {
+        
+        // TODO VATS
+        //            ut_ad(!(m_mode & LOCK_PREDICATE));
+        //            ut_ad(!(m_mode & LOCK_PRDT_PAGE));
+        
+        HASH_DELETE(lock_t, hash, lock_hash_get(lock->type_mode),
+                    m_rec_id.fold(), lock);
+        lock_rec_insert_by_trx_age(lock, m_mode & LOCK_WAIT);
+    }
 
 	// Move it only when it does not cause a deadlock.
 	if (innodb_lock_schedule_algorithm
@@ -1835,7 +1838,7 @@ RecLock::add_to_waitq(const lock_t* wait_for, const lock_prdt_t* prdt)
 
 	ut_ad(lock_get_wait(lock));
 
-	dberr_t	err = deadlock_check(lock);
+    dberr_t	err = deadlock_check(lock);
 
 	ut_ad(trx_mutex_own(m_trx));
 
