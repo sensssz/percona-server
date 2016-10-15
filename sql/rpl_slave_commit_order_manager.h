@@ -226,7 +226,7 @@ inline int commit_order_manager_priority_preference(THD *thd1,
     
     Slave_worker *worker1= get_thd_worker(thd1);
     Slave_worker *worker2= get_thd_worker(thd2);
-    Commit_order_manager *mngr= self_w->get_commit_order_manager();
+    Commit_order_manager *mngr= worker1->get_commit_order_manager();
     
     /* Check if both workers are working for the same channel */
     if (mngr != NULL && worker1->c_rli == worker2->c_rli)
