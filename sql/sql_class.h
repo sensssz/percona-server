@@ -86,15 +86,12 @@ void set_thd_stage_info(void *thd,
 #define THD_STAGE_INFO(thd, stage) \
   (thd)->enter_stage(& stage, NULL, __func__, __FILE__, __LINE__)
 
+extern bool is_slave_replication;
 
-/** Check if there is any preference on the order of 2 transactions.
- One of them is preferred is both are slaves executing in-order replication.
- @param thds associated with 2 transactions.
- @retval -1 if thd1 is preferred (should commit first)
- @retval 1 if thd2 is preferred (should commit first)
- @retval 0 if no preference */
+
+/** Return true if this the a slave server doing replication. */
 extern "C"
-int thd_priority_preference(MYSQL_THD thd1, MYSQL_THD thd2);
+int is_slave_replication();
 
 enum enum_delay_key_write { DELAY_KEY_WRITE_NONE, DELAY_KEY_WRITE_ON,
 			    DELAY_KEY_WRITE_ALL };
