@@ -90,11 +90,6 @@ void set_thd_stage_info(void *thd,
 
 extern bool is_slave_replication;
 
-
-/** Return true if this the a slave server doing replication. */
-extern "C"
-int is_slave_replication();
-
 enum enum_delay_key_write { DELAY_KEY_WRITE_NONE, DELAY_KEY_WRITE_ON,
 			    DELAY_KEY_WRITE_ALL };
 enum enum_rbr_exec_mode { RBR_EXEC_MODE_STRICT,
