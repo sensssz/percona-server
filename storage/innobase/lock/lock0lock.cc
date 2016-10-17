@@ -1675,6 +1675,10 @@ RecLock::check_deadlock_result(const trx_t* victim_trx, lock_t* lock)
         HASH_DELETE(lock_t, hash, lock_hash_get(lock->type_mode),
                     m_rec_id.fold(), lock);
         lock_rec_insert_by_trx_age(lock, m_mode & LOCK_WAIT);
+        if (lock_get_wait(lock) && !lock_rec_has_to_wait_in_queue(lock)) {
+            lock_reset_lock_and_trx_wait(lock);
+            return DB_SUCCESS_LOCKED_REC;
+        }
     }
 
     if (m_trx->lock.wait_lock == NULL) {
@@ -5584,10 +5588,7 @@ lock_rec_queue_validate(
 
 			ut_ad(!trx_is_ac_nl_ro(lock->trx));
 
-			if (lock_get_wait(lock)
-                && (innodb_lock_schedule_algorithm
-                    == INNODB_LOCK_SCHEDULE_ALGORITHM_FCFS
-                    || is_slave_replication)) {
+			if (lock_get_wait(lock)) {
 				ut_a(lock_rec_has_to_wait_in_queue(lock));
 			}
 
@@ -5663,10 +5664,7 @@ lock_rec_queue_validate(
 					lock->trx);
 			ut_a(!other_lock);
 
-		} else if (lock_get_wait(lock) && !lock_rec_get_gap(lock)
-			   && (innodb_lock_schedule_algorithm
-                   == INNODB_LOCK_SCHEDULE_ALGORITHM_FCFS
-                   || is_slave_replication)) {
+		} else if (lock_get_wait(lock) && !lock_rec_get_gap(lock)) {
 
 			// If using VATS, it's possible that a wait lock is
 			// inserted to a place in the list such that it does
