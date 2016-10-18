@@ -1,0 +1,14 @@
+-- source include/have_innodb.inc
+# This is a debug variable for now
+-- source include/have_debug.inc
+
+SELECT @@global.innodb_lock_schedule_algorithm_basic;
+
+SET GLOBAL innodb_lock_schedule_algorithm_basic= 'FCFS';
+
+SELECT @@global.innodb_buffer_pool_evict;
+
+SET GLOBAL innodb_lock_schedule_algorithm_basic= 'VATS';
+
+SELECT @@global.innodb_lock_schedule_algorithm_basic;
+
