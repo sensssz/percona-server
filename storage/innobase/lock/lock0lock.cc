@@ -1548,9 +1548,11 @@ Insert a lock to the hash list according to the mode (whether it is a wait
 lock) and the age of the transaction the it is associated with.
 If the lock is not a wait lock, insert it to the head of the hash list.
 Otherwise, insert it to the middle of the wait locks according to the age of
-the transaciton. */
+the transaciton.
+@return DB_SUCCESS_LOCKED_REC if the lock is granted in this function, and
+        DB_SUCCESS otherwise. */
 static
-void
+dberr_t
 lock_rec_insert_by_trx_age(
 	lock_t *in_lock) /*!< in: lock to be insert */{
     ulint               space;
@@ -1573,7 +1575,7 @@ lock_rec_insert_by_trx_age(
 	if (node == NULL || !lock_get_wait(in_lock) || has_higher_priority(in_lock, node)) {
 		cell->node = in_lock;
 		in_lock->hash = node;
-		return;
+		return DB_SUCCESS;
 	}
 	while (node != NULL && has_higher_priority((lock_t *) node->hash,
 						   in_lock)) {
@@ -1582,6 +1584,20 @@ lock_rec_insert_by_trx_age(
 	next = (lock_t *) node->hash;
 	node->hash = in_lock;
     in_lock->hash = next;
+    
+    if (lock_get_wait(in_lock) && !lock_rec_has_to_wait_in_queue(in_lock)) {
+        lock_grant(in_lock, true);
+        if (cell->node != in_lock) {
+            // Move it to the front of the queue
+            node->hash = in_lock->hash;
+            next = (lock_t *) cell->node;
+            cell->node = in_lock;
+            in_lock->hash = next;
+        }
+        return DB_SUCCESS_LOCKED_REC;
+    }
+    
+    return DB_SUCCESS;
 }
 
 static
@@ -1917,9 +1933,7 @@ RecLock::add_to_waitq(const lock_t* wait_for, const lock_prdt_t* prdt)
         
         HASH_DELETE(lock_t, hash, lock_hash_get(lock->type_mode),
                     m_rec_id.fold(), lock);
-        lock_rec_insert_by_trx_age(lock);
-        if (lock_get_wait(lock) && !lock_rec_has_to_wait_in_queue(lock)) {
-            lock_grant(lock, true);
+        if (lock_rec_insert_by_trx_age(lock) == DB_SUCCESS_LOCKED_REC) {
             return DB_SUCCESS_LOCKED_REC;
         }
     }
@@ -2633,11 +2647,24 @@ lock_grant_and_move_on_page(
     
     previous = (lock_t *) hash_get_nth_cell(lock_hash,
                                             hash_calc_hash(rec_fold, lock_hash))->node;
+    if (previous == NULL) {
+        return;
+    }
+    if (previous->un_member.rec_lock.space == space &&
+        previous->un_member.rec_lock.page_no == page_no) {
+        lock = previous;
+    }
+    else {
+        while (previous->hash &&
+               (previous->hash->un_member.rec_lock.space != space ||
+                previous->hash->un_member.rec_lock.page_no != page_no)) {
+            previous = previous->hash;
+        }
+        lock = previous->hash;
+    }
     /* Grant locks if there are no conflicting locks ahead.
      Move granted locks to the head of the list. */
-    for (lock = lock_rec_get_first_on_page_addr(lock_hash, space,
-                                                page_no);
-         lock != NULL;) {
+    for (; lock != NULL;) {
         
         /* If the lock is a wait lock on this page, and it does not need to wait. */
         if ((lock->un_member.rec_lock.space == space)
@@ -4482,9 +4509,21 @@ lock_grant_and_move_on_rec(
     
     previous = (lock_t *) hash_get_nth_cell(lock_hash,
                                             hash_calc_hash(rec_fold, lock_hash))->node;
+    if (previous == NULL) {
+        return;
+    }
+    if (previous == first_lock) {
+        lock = previous;
+    } else {
+        while (previous->hash &&
+               previous->hash != first_lock) {
+            previous = previous->hash;
+        }
+        lock = previous->hash;
+    }
     /* Grant locks if there are no conflicting locks ahead.
      Move granted locks to the head of the list. */
-    for (lock = first_lock; lock != NULL;) {
+    for (;lock != NULL;) {
         
         /* If the lock is a wait lock on this page, and it does not need to wait. */
         if (lock->un_member.rec_lock.space == space
