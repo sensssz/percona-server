@@ -1540,7 +1540,7 @@ has_higher_priority(
 	} else if (!lock_get_wait(lock2)) {
 		return false;
 	}
-	return lock1->trx->start_time < lock2->trx->start_time;
+	return lock1->trx->start_time_micro <= lock2->trx->start_time_micro;
 }
 
 /*********************************************************************//**
@@ -1575,6 +1575,10 @@ lock_rec_insert_by_trx_age(
 	if (node == NULL || !lock_get_wait(in_lock) || has_higher_priority(in_lock, node)) {
 		cell->node = in_lock;
 		in_lock->hash = node;
+        if (lock_get_wait(in_lock)) {
+            lock_grant(in_lock, true);
+            return DB_SUCCESS_LOCKED_REC;
+        }
 		return DB_SUCCESS;
 	}
 	while (node != NULL && has_higher_priority((lock_t *) node->hash,
@@ -1679,7 +1683,7 @@ RecLock::lock_add(lock_t* lock, bool add_to_hash)
 		++lock->index->table->n_rec_locks;
         
         if (innodb_lock_schedule_algorithm == INNODB_LOCK_SCHEDULE_ALGORITHM_VATS
-            && !is_slave_replication) {
+            && !thd_is_replication_slave_thread(lock->trx->mysql_thd)) {
             if (wait_lock) {
                 HASH_INSERT(lock_t, hash, lock_hash, key, lock);
             } else {
@@ -1927,14 +1931,15 @@ RecLock::add_to_waitq(const lock_t* wait_for, const lock_prdt_t* prdt)
     // Move it only when it does not cause a deadlock.
     if (err != DB_DEADLOCK
         && innodb_lock_schedule_algorithm
-            == INNODB_LOCK_SCHEDULE_ALGORITHM_VATS
-        && !is_slave_replication
+        == INNODB_LOCK_SCHEDULE_ALGORITHM_VATS
+        && !thd_is_replication_slave_thread(lock->trx->mysql_thd)
         && !trx_is_high_priority(lock->trx)) {
         
         HASH_DELETE(lock_t, hash, lock_hash_get(lock->type_mode),
                     m_rec_id.fold(), lock);
-        if (lock_rec_insert_by_trx_age(lock) == DB_SUCCESS_LOCKED_REC) {
-            return DB_SUCCESS_LOCKED_REC;
+        dberr_t res = lock_rec_insert_by_trx_age(lock);
+        if (res != DB_SUCCESS) {
+            return res;
         }
     }
 
@@ -2329,7 +2334,8 @@ lock_grant(
 	lock_t*	lock,	/*!< in/out: waiting lock request */
     bool    owns_trx_mutex)    /*!< in: whether lock->trx->mutex is owned */
 {
-	ut_ad(lock_mutex_own());
+    ut_ad(lock_mutex_own());
+    ut_ad(trx_mutex_own(lock->trx) == owns_trx_mutex);
 
 	lock_reset_lock_and_trx_wait(lock);
 
@@ -2637,9 +2643,9 @@ lock_rec_cancel(
 static
 void
 lock_grant_and_move_on_page(
-    hash_table_t *lock_hash,
-    ulint         space,
-    ulint         page_no)
+                            hash_table_t *lock_hash,
+                            ulint         space,
+                            ulint         page_no)
 {
     lock_t*		lock;
     lock_t*		previous;
@@ -2658,13 +2664,15 @@ lock_grant_and_move_on_page(
         while (previous->hash &&
                (previous->hash->un_member.rec_lock.space != space ||
                 previous->hash->un_member.rec_lock.page_no != page_no)) {
-            previous = previous->hash;
-        }
+                   previous = previous->hash;
+               }
         lock = previous->hash;
     }
+    
+    ut_ad(previous->hash == lock || previous == lock);
     /* Grant locks if there are no conflicting locks ahead.
      Move granted locks to the head of the list. */
-    for (; lock != NULL;) {
+    for (;lock != NULL;) {
         
         /* If the lock is a wait lock on this page, and it does not need to wait. */
         if ((lock->un_member.rec_lock.space == space)
@@ -2734,7 +2742,8 @@ lock_rec_dequeue_from_page(
 	MONITOR_DEC(MONITOR_NUM_RECLOCK);
 
 	if (innodb_lock_schedule_algorithm
-	    == INNODB_LOCK_SCHEDULE_ALGORITHM_FCFS || is_slave_replication) {
+	    == INNODB_LOCK_SCHEDULE_ALGORITHM_FCFS ||
+        thd_is_replication_slave_thread(in_lock->trx->mysql_thd)) {
 
 		/* Check if waiting locks in the queue can now be granted:
 		grant locks if there are no conflicting locks ahead. Stop at
@@ -4613,7 +4622,8 @@ released:
     lock_rec_reset_nth_bit(lock, heap_no);
     
     if (innodb_lock_schedule_algorithm
-        == INNODB_LOCK_SCHEDULE_ALGORITHM_FCFS || is_slave_replication) {
+        == INNODB_LOCK_SCHEDULE_ALGORITHM_FCFS ||
+        thd_is_replication_slave_thread(lock->trx->mysql_thd)) {
 
         /* Check if we can now grant waiting lock requests */
 
@@ -7583,7 +7593,7 @@ DeadlockChecker::get_first_lock(ulint* heap_no) const
 	ut_a(lock != m_wait_lock ||
 	     (innodb_lock_schedule_algorithm
 	      == INNODB_LOCK_SCHEDULE_ALGORITHM_VATS
-          && !is_slave_replication));
+          && !thd_is_replication_slave_thread(lock->trx->mysql_thd)));
 
 	/* Check that the lock type doesn't change. */
 	ut_ad(lock_get_type_low(lock) == lock_get_type_low(m_wait_lock));
