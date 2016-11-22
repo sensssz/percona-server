@@ -1096,6 +1096,8 @@ trx_start_low(
 
 	trx->start_time = ut_time();
 
+    clock_gettime(CLOCK_REALTIME, &trx->start_time_nano);
+
 	MONITOR_INC(MONITOR_TRX_ACTIVE);
 }
 
