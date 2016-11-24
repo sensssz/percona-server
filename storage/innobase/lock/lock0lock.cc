@@ -1919,7 +1919,6 @@ lock_rec_create(
 	lock_rec_set_nth_bit(lock, heap_no);
 
 	index->table->n_rec_locks++;
-
     ut_ad(index->table->n_ref_count > 0 || !index->table->can_be_evicted);
 
     if (innodb_lock_schedule_algorithm == INNODB_LOCK_SCHEDULE_ALGORITHM_FCFS
