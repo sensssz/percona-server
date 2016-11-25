@@ -1816,7 +1816,7 @@ has_higher_priority(
 }
 
 static
-void
+dberr_t
 lock_rec_insert_by_trx_age(
   lock_t *in_lock,
   bool wait)
@@ -1832,7 +1832,7 @@ lock_rec_insert_by_trx_age(
   if (node == NULL || !wait || has_higher_priority(in_lock, node)) {
     cell->node = in_lock;
     in_lock->hash = node;
-    return;
+    return DB_SUCCESS;
   }
   while (node != NULL && has_higher_priority((lock_t *) node->hash, in_lock)) {
     node = (lock_t *) node->hash;
@@ -1840,6 +1840,7 @@ lock_rec_insert_by_trx_age(
   lock_t *next = (lock_t *) node->hash;
   node->hash = in_lock;
   in_lock->hash = next;
+  return DB_SUCCESS;
 }
 
 static
