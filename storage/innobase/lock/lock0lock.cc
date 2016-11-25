@@ -1908,6 +1908,28 @@ lock_rec_insert_to_head(
     }
 }
 
+static
+void
+lock_rec_insert_to_head(
+	lock_t *in_lock,   /*!< in: lock to be insert */
+    ulint   rec_fold)  /*!< in: rec_fold of the page */
+{
+    hash_cell_t*        cell;
+    lock_t*				node;
+    
+    if (in_lock == NULL) {
+        return;
+    }
+
+    cell = hash_get_nth_cell(lock_sys->rec_hash,
+                             hash_calc_hash(rec_fold, lock_sys->rec_hash));
+    node = (lock_t *) cell->node;
+    if (node != in_lock) {
+        cell->node = in_lock;
+        in_lock->hash = node;
+    }
+}
+
 
 /*********************************************************************//**
 Creates a new record lock and inserts it to the lock queue. Does NOT check
