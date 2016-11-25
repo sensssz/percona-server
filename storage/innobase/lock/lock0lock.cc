@@ -2130,7 +2130,7 @@ lock_rec_enqueue_waiting(
         == INNODB_LOCK_SCHEDULE_ALGORITHM_VATS
         && !thd_is_replication_slave_thread(lock->trx->mysql_thd)) {
 
-        rec_fold = lock_rec_fold(lock->un_member.rec_lock.spage,
+        rec_fold = lock_rec_fold(lock->un_member.rec_lock.space,
                                  lock->un_member.rec_lock.page_no);
         HASH_DELETE(lock_t, hash, lock_sys->rec_hash,
                     rec_fold, lock);
