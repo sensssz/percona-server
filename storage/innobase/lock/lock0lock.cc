@@ -386,6 +386,15 @@ static lock_stack_t*	lock_stack;
 static const ulint	lock_types = UT_ARR_SIZE(lock_compatibility_matrix);
 #endif /* UNIV_DEBUG */
 
+/*********************************************************************//**
+Checks if a waiting record lock request still has to wait in a queue.
+@return	lock that is causing the wait */
+static
+const lock_t*
+lock_rec_has_to_wait_in_queue(
+/*==========================*/
+    const lock_t*	wait_lock);	/*!< in: waiting record lock */
+
 #ifdef UNIV_PFS_MUTEX
 /* Key to register mutex with performance schema */
 UNIV_INTERN mysql_pfs_key_t	lock_sys_mutex_key;
@@ -1834,26 +1843,53 @@ lock_rec_insert_by_trx_age(
   lock_t *in_lock,
   bool wait)
 {
-  ulint space = in_lock->un_member.rec_lock.space;
-  ulint page_no = in_lock->un_member.rec_lock.page_no;
-  ulint rec_fold = lock_rec_fold(space, page_no);
-  hash_cell_t* cell = hash_get_nth_cell(lock_sys->rec_hash,
-                                        hash_calc_hash(rec_fold, lock_sys->rec_hash));
-  
-  lock_t *node = (lock_t *) cell->node;
-  // If in_lock is not a wait lock, we insert it to the head of the list.
-  if (node == NULL || !wait || has_higher_priority(in_lock, node)) {
-    cell->node = in_lock;
-    in_lock->hash = node;
+    ulint               space;
+    ulint               page_no;
+    ulint				rec_fold;
+    hash_table_t*       hash;
+    hash_cell_t*        cell;
+    lock_t*				node;
+    lock_t*				next;
+
+    space = in_lock->un_member.rec_lock.space;
+    page_no = in_lock->un_member.rec_lock.page_no;
+    rec_fold = lock_rec_fold(space, page_no);
+    hash = lock_hash_get(in_lock->type_mode);
+    cell = hash_get_nth_cell(hash,
+                             hash_calc_hash(rec_fold, hash));
+
+    node = (lock_t *) cell->node;
+    // If in_lock is not a wait lock, we insert it to the head of the list.
+    if (node == NULL || !lock_get_wait(in_lock) || has_higher_priority(in_lock, node)) {
+        cell->node = in_lock;
+        in_lock->hash = node;
+        if (lock_get_wait(in_lock)) {
+            lock_grant(in_lock, true);
+            return DB_SUCCESS_LOCKED_REC;
+        }
+        return DB_SUCCESS;
+    }
+    while (node != NULL && has_higher_priority((lock_t *) node->hash,
+                                               in_lock)) {
+        node = (lock_t *) node->hash;
+    }
+    next = (lock_t *) node->hash;
+    node->hash = in_lock;
+    in_lock->hash = next;
+
+    if (lock_get_wait(in_lock) && !lock_rec_has_to_wait_in_queue(in_lock)) {
+        lock_grant(in_lock, true);
+        if (cell->node != in_lock) {
+            // Move it to the front of the queue
+            node->hash = in_lock->hash;
+            next = (lock_t *) cell->node;
+            cell->node = in_lock;
+            in_lock->hash = next;
+        }
+        return DB_SUCCESS_LOCKED_REC;
+    }
+    
     return DB_SUCCESS;
-  }
-  while (node != NULL && has_higher_priority((lock_t *) node->hash, in_lock)) {
-    node = (lock_t *) node->hash;
-  }
-  lock_t *next = (lock_t *) node->hash;
-  node->hash = in_lock;
-  in_lock->hash = next;
-  return DB_SUCCESS;
 }
 
 static
