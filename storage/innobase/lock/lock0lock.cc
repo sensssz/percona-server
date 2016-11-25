@@ -1860,10 +1860,6 @@ lock_rec_insert_by_trx_age(
     if (node == NULL || !lock_get_wait(in_lock) || has_higher_priority(in_lock, node)) {
         cell->node = in_lock;
         in_lock->hash = node;
-        if (lock_get_wait(in_lock)) {
-            lock_grant(in_lock, true);
-            return DB_SUCCESS_LOCKED_REC;
-        }
         return DB_SUCCESS;
     }
     while (node != NULL && has_higher_priority((lock_t *) node->hash,
@@ -1873,18 +1869,6 @@ lock_rec_insert_by_trx_age(
     next = (lock_t *) node->hash;
     node->hash = in_lock;
     in_lock->hash = next;
-
-    if (lock_get_wait(in_lock) && !lock_rec_has_to_wait_in_queue(in_lock)) {
-        lock_grant(in_lock, true);
-        if (cell->node != in_lock) {
-            // Move it to the front of the queue
-            node->hash = in_lock->hash;
-            next = (lock_t *) cell->node;
-            cell->node = in_lock;
-            in_lock->hash = next;
-        }
-        return DB_SUCCESS_LOCKED_REC;
-    }
     
     return DB_SUCCESS;
 }
