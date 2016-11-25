@@ -395,6 +395,16 @@ lock_rec_has_to_wait_in_queue(
 /*==========================*/
     const lock_t*	wait_lock);	/*!< in: waiting record lock */
 
+/*************************************************************//**
+Grants a lock to a waiting lock request and releases the waiting transaction.
+The caller must hold lock_sys->mutex but not lock->trx->mutex. */
+static
+void
+lock_grant(
+/*=======*/
+	lock_t*	lock,	/*!< in/out: waiting lock request */
+    bool    owns_trx_mutex);
+
 #ifdef UNIV_PFS_MUTEX
 /* Key to register mutex with performance schema */
 UNIV_INTERN mysql_pfs_key_t	lock_sys_mutex_key;
@@ -2552,13 +2562,16 @@ static
 void
 lock_grant(
 /*=======*/
-	lock_t*	lock)	/*!< in/out: waiting lock request */
+	lock_t*	lock,	/*!< in/out: waiting lock request */
+    bool    owns_trx_mutex)
 {
-	ut_ad(lock_mutex_own());
+	ut_ad(lock_mutex_own() == owns_trx_mutex);
 
 	lock_reset_lock_and_trx_wait(lock);
 
-	trx_mutex_enter(lock->trx);
+    if (!owns_trx_mutex) {
+        trx_mutex_enter(lock->trx);
+    }
 
 	if (lock_get_mode(lock) == LOCK_AUTO_INC) {
 		dict_table_t*	table = lock->un_member.tab_lock.table;
@@ -2596,7 +2609,9 @@ lock_grant(
 		}
 	}
 
-	trx_mutex_exit(lock->trx);
+    if (!owns_trx_mutex) {
+        trx_mutex_exit(lock->trx);
+    }
 }
 
 /*************************************************************//**
@@ -2706,7 +2721,7 @@ lock_rec_dequeue_from_page(
              lock = lock_rec_get_next_on_page(lock)) {
             if(lock_get_wait(lock) &&
                !lock_rec_has_to_wait_in_queue(lock)) {
-                lock_grant(lock);
+                lock_grant(lock, false);
             }
         }
     } else {
@@ -2719,7 +2734,7 @@ lock_rec_dequeue_from_page(
                 && lock_get_wait(lock)
                 && !lock_rec_has_to_wait_in_queue(lock)) {
 
-                lock_grant(lock);
+                lock_grant(lock, false);
 
                 if (previous != NULL) {
                     // Move the lock to the head of the list
@@ -4778,7 +4793,7 @@ lock_table_dequeue(
 
 			/* Grant the lock */
 			ut_ad(in_lock->trx != lock->trx);
-			lock_grant(lock);
+			lock_grant(lock, false);
 		}
 	}
 }
@@ -4862,7 +4877,7 @@ released:
 
                 /* Grant the lock */
                 ut_ad(trx != lock->trx);
-                lock_grant(lock);
+                lock_grant(lock, false);
             }
         }
     } else {
@@ -4879,7 +4894,7 @@ released:
                 && lock_get_wait(lock)
                 && !lock_rec_has_to_wait_in_queue(lock)) {
 
-                lock_grant(lock);
+                lock_grant(lock, false);
 
                 if (previous != NULL) {
                     // Move the lock to the head of the list
