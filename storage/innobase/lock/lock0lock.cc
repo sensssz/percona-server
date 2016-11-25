@@ -1855,6 +1855,28 @@ lock_rec_insert_by_trx_age(
   in_lock->hash = next;
 }
 
+static
+void
+lock_rec_insert_to_head(
+	lock_t *in_lock,   /*!< in: lock to be insert */
+    ulint   rec_fold)  /*!< in: rec_fold of the page */
+{
+    hash_cell_t*        cell;
+    lock_t*				node;
+    
+    if (in_lock == NULL) {
+        return;
+    }
+
+    cell = hash_get_nth_cell(lock_sys->rec_hash,
+                             hash_calc_hash(rec_fold, lock_sys->rec_hash));
+    node = (lock_t *) cell->node;
+    if (node != in_lock) {
+        cell->node = in_lock;
+        in_lock->hash = node;
+    }
+}
+
 
 /*********************************************************************//**
 Creates a new record lock and inserts it to the lock queue. Does NOT check
@@ -1879,6 +1901,7 @@ lock_rec_create(
 	lock_t*		lock;
 	ulint		page_no;
 	ulint		space;
+    ulint       rec_fold;
 	ulint		n_bits;
 	ulint		n_bytes;
 	const page_t*	page;
@@ -1922,6 +1945,7 @@ lock_rec_create(
 	lock->un_member.rec_lock.space = space;
 	lock->un_member.rec_lock.page_no = page_no;
 	lock->un_member.rec_lock.n_bits = n_bytes * 8;
+    rec_fold = lock_rec_fold(space, page_no);
 
 	/* Reset to zero the bitmap which resides immediately after the
 	lock struct */
@@ -1934,12 +1958,15 @@ lock_rec_create(
 	index->table->n_rec_locks++;
     ut_ad(index->table->n_ref_count > 0 || !index->table->can_be_evicted);
 
-    if (innodb_lock_schedule_algorithm == INNODB_LOCK_SCHEDULE_ALGORITHM_FCFS
-        || thd_is_replication_slave_thread(trx->mysql_thd)) {
-        HASH_INSERT(lock_t, hash, lock_sys->rec_hash,
-                    lock_rec_fold(space, page_no), lock);
+    if (innodb_lock_schedule_algorithm == INNODB_LOCK_SCHEDULE_ALGORITHM_VATS
+        && !thd_is_replication_slave_thread(lock->trx->mysql_thd)) {
+        if (type_mode & LOCK_WAIT) {
+            HASH_INSERT(lock_t, hash, lock_sys->rec_hash, rec_fold, lock);
+        } else {
+            lock_rec_insert_to_head(lock, rec_fold);
+        }
     } else {
-        lock_rec_insert_by_trx_age(lock, type_mode & LOCK_WAIT);
+        HASH_INSERT(lock_t, hash, lock_sys->rec_hash, rec_fold, lock);
     }
 
 	lock_sys->rec_num++;
@@ -1997,6 +2024,8 @@ lock_rec_enqueue_waiting(
 	trx_id_t		victim_trx_id;
 	ulint			sec;
 	ulint			ms;
+    dberr_t         err;
+    ulint           rec_fold;
 
 
 	ut_ad(lock_mutex_own());
@@ -2068,32 +2097,49 @@ lock_rec_enqueue_waiting(
 		transaction as a victim, it is possible that we
 		already have the lock now granted! */
 
-		return(DB_SUCCESS_LOCKED_REC);
-	}
+		err = (DB_SUCCESS_LOCKED_REC);
+    } else {
+        trx->lock.que_state = TRX_QUE_LOCK_WAIT;
 
-	trx->lock.que_state = TRX_QUE_LOCK_WAIT;
+        trx->lock.was_chosen_as_deadlock_victim = FALSE;
+        trx->lock.wait_started = ut_time();
 
-	trx->lock.was_chosen_as_deadlock_victim = FALSE;
-	trx->lock.wait_started = ut_time();
+        if (UNIV_UNLIKELY(trx->take_stats)) {
+            ut_usectime(&sec, &ms);
+            trx->lock_que_wait_ustarted = (ib_uint64_t)sec * 1000000 + ms;
+        }
 
-	if (UNIV_UNLIKELY(trx->take_stats)) {
-		ut_usectime(&sec, &ms);
-		trx->lock_que_wait_ustarted = (ib_uint64_t)sec * 1000000 + ms;
-	}
-
-	ut_a(que_thr_stop(thr));
+        ut_a(que_thr_stop(thr));
 
 #ifdef UNIV_DEBUG
-	if (lock_print_waits) {
-		fprintf(stderr, "Lock wait for trx " TRX_ID_FMT " in index ",
-			trx->id);
-		ut_print_name(stderr, trx, FALSE, index->name);
-	}
+        if (lock_print_waits) {
+            fprintf(stderr, "Lock wait for trx " TRX_ID_FMT " in index ",
+                trx->id);
+            ut_print_name(stderr, trx, FALSE, index->name);
+        }
 #endif /* UNIV_DEBUG */
 
-	MONITOR_INC(MONITOR_LOCKREC_WAIT);
+        MONITOR_INC(MONITOR_LOCKREC_WAIT);
 
-	return(DB_LOCK_WAIT);
+        err = (DB_LOCK_WAIT);
+    }
+    // Move it only when it does not cause a deadlock.
+    if (err != DB_DEADLOCK
+        && innodb_lock_schedule_algorithm
+        == INNODB_LOCK_SCHEDULE_ALGORITHM_VATS
+        && !thd_is_replication_slave_thread(lock->trx->mysql_thd)) {
+
+        rec_fold = lock_rec_fold(lock->un_member.rec_fold.spage,
+                                 lock->un_member.rec_fold.page_no);
+        HASH_DELETE(lock_t, hash, lock_sys->rec_hash,
+                    rec_fold, lock);
+        dberr_t res = lock_rec_insert_by_trx_age(lock, lock_get_wait(lock));
+        if (res != DB_SUCCESS) {
+            return res;
+        }
+    }
+
+    return err;
 }
 
 /*********************************************************************//**
