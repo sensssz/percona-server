@@ -1851,7 +1851,7 @@ lock_rec_insert_by_trx_age(
     space = in_lock->un_member.rec_lock.space;
     page_no = in_lock->un_member.rec_lock.page_no;
     rec_fold = lock_rec_fold(space, page_no);
-    hash = lock_hash_get(in_lock->type_mode);
+    hash = lock_sys->rec_hash;
     cell = hash_get_nth_cell(hash,
                              hash_calc_hash(rec_fold, hash));
 
