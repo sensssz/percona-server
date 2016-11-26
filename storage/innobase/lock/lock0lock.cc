@@ -2638,48 +2638,6 @@ lock_rec_move_to_front(
   }
 }
 
-static
-void
-lock_rec_grant_and_move_on_page(
-    lock_t  *in_lock)
-{
-    lock_t  *lock;
-    lock_t  *previous;
-    ulint   space;
-    ulint   page_no;
-    ulint   rec_fold;
-
-    space = in_lock->un_member.rec_lock.space;
-    page_no = in_lock->un_member.rec_lock.page_no;
-    rec_fold = lock_rec_fold(space, page_no);
-    previous = NULL;
-    for (lock = lock_rec_get_first_on_page_addr(space, page_no);
-         lock != NULL;) {
-        // If the lock is a wait lock on this page, and it does not need to wait
-        if ((lock->un_member.rec_lock.space == space)
-            && (lock->un_member.rec_lock.page_no == page_no)
-            && lock_get_wait(lock)
-            && !lock_rec_has_to_wait_in_queue(lock)) {
-
-            lock_grant(lock, false);
-
-            if (previous != NULL) {
-                // Move the lock to the head of the list
-                HASH_GET_NEXT(hash, previous) = HASH_GET_NEXT(hash, lock);
-                lock_rec_move_to_front(lock, rec_fold);
-            } else {
-                // Already at the head of the list.
-                previous = lock;
-            }
-            // Move on to the next lock
-            lock = static_cast<lock_t *>(HASH_GET_NEXT(hash, previous));
-        } else {
-            previous = lock;
-            lock = static_cast<lock_t *>(HASH_GET_NEXT(hash, lock));
-        }
-    }
-}
-
 /*************************************************************//**
 Removes a record lock request, waiting or granted, from the queue and
 grants locks to other transactions in the queue if they now are entitled
@@ -2697,6 +2655,8 @@ lock_rec_dequeue_from_page(
 {
 	ulint		space;
 	ulint		page_no;
+    ulint       rec_fold;
+    lock_t*     previous;
 	lock_t*		lock;
 	trx_lock_t*	trx_lock;
 
@@ -2708,6 +2668,7 @@ lock_rec_dequeue_from_page(
 
 	space = in_lock->un_member.rec_lock.space;
 	page_no = in_lock->un_member.rec_lock.page_no;
+    rec_fold = lock_rec_fold(space, page_no);
 
 	in_lock->index->table->n_rec_locks--;
 
@@ -2734,7 +2695,32 @@ lock_rec_dequeue_from_page(
             }
         }
     } else {
-        lock_rec_grant_and_move_on_page(in_lock);
+        previous = NULL;
+        for (lock = lock_rec_get_first_on_page_addr(space, page_no);
+             lock != NULL;) {
+            // If the lock is a wait lock on this page, and it does not need to wait
+            if ((lock->un_member.rec_lock.space == space)
+                && (lock->un_member.rec_lock.page_no == page_no)
+                && lock_get_wait(lock)
+                && !lock_rec_has_to_wait_in_queue(lock)) {
+
+                lock_grant(lock, false);
+
+                if (previous != NULL) {
+                    // Move the lock to the head of the list
+                    HASH_GET_NEXT(hash, previous) = HASH_GET_NEXT(hash, lock);
+                    lock_rec_move_to_front(lock, rec_fold);
+                } else {
+                    // Already at the head of the list.
+                    previous = lock;
+                }
+                // Move on to the next lock
+                lock = static_cast<lock_t *>(HASH_GET_NEXT(hash, previous));
+            } else {
+                previous = lock;
+                lock = static_cast<lock_t *>(HASH_GET_NEXT(hash, lock));
+            }
+        }
     }
 }
 
@@ -4781,50 +4767,6 @@ lock_table_dequeue(
 }
 
 /*=========================== LOCK RELEASE ==============================*/
-static
-void
-lock_rec_grant_and_move_on_rec(
-    lock_t  *in_lock,
-    lock_t  *first_lock,
-    ulint    heap_no)
-{
-    lock_t  *lock;
-    lock_t  *previous;
-    ulint   space;
-    ulint   page_no;
-    ulint   rec_fold;
-
-    space = in_lock->un_member.rec_lock.space;
-    page_no = in_lock->un_member.rec_lock.page_no;
-    rec_fold = lock_rec_fold(space, page_no);
-    previous = NULL;
-    for (lock = first_lock;
-         lock != NULL;) {
-        // If the lock is a wait lock on this page, and it does not need to wait
-        if ((lock->un_member.rec_lock.space == space)
-            && (lock->un_member.rec_lock.page_no == page_no)
-            && lock_rec_get_nth_bit(lock, heap_no)
-            && lock_get_wait(lock)
-            && !lock_rec_has_to_wait_in_queue(lock)) {
-
-            lock_grant(lock, false);
-
-            if (previous != NULL) {
-                // Move the lock to the head of the list
-                HASH_GET_NEXT(hash, previous) = HASH_GET_NEXT(hash, lock);
-                lock_rec_move_to_front(lock, rec_fold);
-            } else {
-                // Already at the head of the list.
-                previous = lock;
-            }
-            // Move on to the next lock
-            lock = static_cast<lock_t *>(HASH_GET_NEXT(hash, previous));
-        } else {
-            previous = lock;
-            lock = static_cast<lock_t *>(HASH_GET_NEXT(hash, lock));
-        }
-    }
-}
 
 /*************************************************************//**
 Removes a granted record lock of a transaction from the queue and grants
@@ -4841,8 +4783,12 @@ lock_rec_unlock(
 	enum lock_mode		lock_mode)/*!< in: LOCK_S or LOCK_X */
 {
 	lock_t*		first_lock;
+    lock_t*     previous;
     lock_t*		lock;
+    ulint       space;
+    ulint       page_no;
     ulint		heap_no;
+    ulint       rec_fold;
 	const char*	stmt;
 	size_t		stmt_len;
 
@@ -4903,7 +4849,36 @@ released:
             }
         }
     } else {
-        lock_rec_grant_and_move_on_rec(lock, first_lock, heap_no);
+        space = lock->un_member.rec_lock.space;
+        page_no = lock->un_member.rec_lock.page_no;
+        rec_fold = lock_rec_fold(space, page_no);
+        previous = NULL;
+        for (lock = first_lock;
+             lock != NULL;) {
+            // If the lock is a wait lock on this page, and it does not need to wait
+            if ((lock->un_member.rec_lock.space == space)
+                && (lock->un_member.rec_lock.page_no == page_no)
+                && lock_rec_get_nth_bit(lock, heap_no)
+                && lock_get_wait(lock)
+                && !lock_rec_has_to_wait_in_queue(lock)) {
+
+                lock_grant(lock, false);
+
+                if (previous != NULL) {
+                    // Move the lock to the head of the list
+                    HASH_GET_NEXT(hash, previous) = HASH_GET_NEXT(hash, lock);
+                    lock_rec_move_to_front(lock, rec_fold);
+                } else {
+                    // Already at the head of the list.
+                    previous = lock;
+                }
+                // Move on to the next lock
+                lock = static_cast<lock_t *>(HASH_GET_NEXT(hash, previous));
+            } else {
+                previous = lock;
+                lock = static_cast<lock_t *>(HASH_GET_NEXT(hash, lock));
+            }
+        }
     }
 
 	lock_mutex_exit();
