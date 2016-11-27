@@ -1,4 +1,4 @@
-# Copyright (c) 2000, 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,7 +24,7 @@
 %global mysql_vendor_2          Sun Microsystems, Inc.
 %global mysql_vendor            Oracle and/or its affiliates
 
-%global mysql_version   5.6.22-71.0
+%global mysql_version   5.6.34-79.0
 
 %global mysqld_user     mysql
 %global mysqld_group    mysql
@@ -145,7 +145,7 @@
       %if "%elver" == "6" || "%elver" == "7"
         %define distro_description      Oracle Linux %elver
         %define distro_releasetag       el%elver
-        %define distro_buildreq         gcc-c++ ncurses-devel perl time zlib-devel cmake libaio-devel
+        %define distro_buildreq         gcc-c++ ncurses-devel perl time zlib-devel cmake libaio-devel numactl-devel
         %define distro_requires         chkconfig coreutils grep procps shadow-utils net-tools
       %else
         %{error:Oracle Linux %{elver} is unsupported}
@@ -168,7 +168,7 @@
             %if "%rhelver" == "6"
               %define distro_description    Red Hat Enterprise Linux 6
               %define distro_releasetag     rhel6
-              %define distro_buildreq       gcc-c++ ncurses-devel perl time zlib-devel cmake libaio-devel
+              %define distro_buildreq       gcc-c++ ncurses-devel perl time zlib-devel cmake libaio-devel numactl-devel
               %define distro_requires       chkconfig coreutils grep procps shadow-utils net-tools
             %else
               %{error:Red Hat Enterprise Linux %{rhelver} is unsupported}
@@ -187,7 +187,7 @@
             %if "%susever" == "11"
               %define distro_description  SUSE Linux Enterprise Server 11
               %define distro_releasetag   sles11
-              %define distro_buildreq     gcc-c++ gdbm-devel gperf ncurses-devel openldap2-client procps pwdutils zlib-devel cmake libaio-devel
+              %define distro_buildreq     gcc-c++ gdbm-devel gperf ncurses-devel openldap2-client procps pwdutils zlib-devel cmake libaio-devel libnuma-devel
               %define distro_requires     aaa_base coreutils grep procps pwdutils
             %else
               %{error:SuSE %{susever} is unsupported}
@@ -242,7 +242,7 @@
 Name:           MySQL%{product_suffix}
 Summary:        MySQL: a very fast and reliable SQL database server
 Group:          Applications/Databases
-Version:        5.6.22_71.0
+Version:        5.6.34_79.0
 Release:        %{release}%{?distro_releasetag:.%{distro_releasetag}}
 Distribution:   %{distro_description}
 License:        Copyright (c) 2000, 2016, %{mysql_vendor}. All rights reserved. Under %{license_type} license as shown in the Description field.
@@ -425,7 +425,7 @@ Obsoletes:      MySQL-embedded-pro
 Obsoletes:      MySQL-embedded-classic MySQL-embedded-community MySQL-embedded-enterprise
 Obsoletes:      MySQL-embedded-advanced-gpl MySQL-embedded-enterprise-gpl
 Provides:       mysql-embedded = %{version}-%{release}
-Provides:       mysql-emdedded%{?_isa} = %{version}-%{release}
+Provides:       mysql-embedded%{?_isa} = %{version}-%{release}
 
 %description -n MySQL-embedded%{product_suffix}
 This package contains the MySQL server as an embedded library.
@@ -562,6 +562,7 @@ install -d $RBR%{_includedir}
 install -d $RBR%{_libdir}
 install -d $RBR%{_mandir}
 install -d $RBR%{_sbindir}
+install -d $RBR/var/lib/mysql-files
 
 mkdir -p $RBR%{_sysconfdir}/my.cnf.d
 
@@ -618,7 +619,7 @@ install -m 644 "%{malloc_lib_source}" \
 # Check local settings to support them.
 if [ -x %{_bindir}/my_print_defaults ]
 then
-  mysql_datadir=`%{_bindir}/my_print_defaults server mysqld | grep '^--datadir=' | sed -n 's/--datadir=//p'`
+  mysql_datadir=`%{_bindir}/my_print_defaults server mysqld | grep '^--datadir=' | tail -1 | sed -n 's/--datadir=//p'`
   PID_FILE_PATT=`%{_bindir}/my_print_defaults server mysqld | grep '^--pid-file=' | sed -n 's/--pid-file=//p'`
 fi
 if [ -z "$mysql_datadir" ]
@@ -723,7 +724,7 @@ esac
 
 STATUS_FILE=$mysql_datadir/RPM_UPGRADE_MARKER
 
-if [ -f $STATUS_FILE ]; then
+if [ -f "$STATUS_FILE" ]; then
 	echo "Some previous upgrade was not finished:"
 	ls -ld $STATUS_FILE
 	echo "Please check its status, then do"
@@ -796,7 +797,7 @@ fi
 # Check local settings to support them.
 if [ -x %{_bindir}/my_print_defaults ]
 then
-  mysql_datadir=`%{_bindir}/my_print_defaults server mysqld | grep '^--datadir=' | sed -n 's/--datadir=//p'`
+  mysql_datadir=`%{_bindir}/my_print_defaults server mysqld | grep '^--datadir=' | tail -1 | sed -n 's/--datadir=//p'`
 fi
 if [ -z "$mysql_datadir" ]
 then
@@ -809,8 +810,8 @@ STATUS_FILE=$mysql_datadir/RPM_UPGRADE_MARKER
 # ----------------------------------------------------------------------
 # Create data directory if needed, check whether upgrade or install
 # ----------------------------------------------------------------------
-if [ ! -d $mysql_datadir ] ; then mkdir -m 755 $mysql_datadir; fi
-if [ -f $STATUS_FILE ] ; then
+if [ ! -d "$mysql_datadir" ] ; then mkdir -m 755 "$mysql_datadir" ; fi
+if [ -f "$STATUS_FILE" ] ; then
 	SERVER_TO_START=`grep '^SERVER_TO_START=' $STATUS_FILE | cut -c17-`
 else
 	SERVER_TO_START=''
@@ -994,7 +995,7 @@ fi
 # Check local settings to support them.
 if [ -x %{_bindir}/my_print_defaults ]
 then
-  mysql_datadir=`%{_bindir}/my_print_defaults server mysqld | grep '^--datadir=' | sed -n 's/--datadir=//p'`
+  mysql_datadir=`%{_bindir}/my_print_defaults server mysqld | grep '^--datadir=' | tail -1 | sed -n 's/--datadir=//p'`
 fi
 if [ -z "$mysql_datadir" ]
 then
@@ -1005,7 +1006,7 @@ NEW_VERSION=%{mysql_version}-%{release}
 STATUS_FILE=$mysql_datadir/RPM_UPGRADE_MARKER-LAST  # Note the difference!
 STATUS_HISTORY=$mysql_datadir/RPM_UPGRADE_HISTORY
 
-if [ -f $STATUS_FILE ] ; then
+if [ -f "$STATUS_FILE" ] ; then
 	SERVER_TO_START=`grep '^SERVER_TO_START=' $STATUS_FILE | cut -c17-`
 else
 	# This should never happen, but let's be prepared
@@ -1131,6 +1132,7 @@ echo "====="                                     >> $STATUS_HISTORY
 %attr(755, root, root) %{_sysconfdir}/init.d/mysql
 %attr(755, root, root) %{_datadir}/mysql/
 %dir %attr(755, mysql, mysql) /var/lib/mysql
+%dir %attr(750, mysql, mysql) /var/lib/mysql-files
 
 # ----------------------------------------------------------------------------
 %files -n MySQL-client%{product_suffix}

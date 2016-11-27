@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, 2014, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2009, 2016, Oracle and/or its affiliates. All rights reserved.
  
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -121,6 +121,8 @@
 /* Readline */
 #define HAVE_HIST_ENTRY 1
 #define USE_LIBEDIT_INTERFACE 1
+/* #undef USE_NEW_READLINE_INTERFACE */
+/* #undef HAVE_READLINE_HISTORY_H */
 
 #define FIONREAD_IN_SYS_IOCTL 1
 #define GWINSZ_IN_SYS_IOCTL 1
@@ -233,7 +235,6 @@
 #define HAVE_PUTENV 1
 #define HAVE_RE_COMP 1
 #define HAVE_REGCOMP 1
-#define HAVE_READDIR_R 1
 #define HAVE_READLINK 1
 #define HAVE_REALPATH 1
 #define HAVE_RENAME 1
@@ -399,6 +400,7 @@
 /* #undef HAVE_UINT64 */
 /* #undef SIZEOF_BOOL */
 /* #undef HAVE_BOOL */
+#define HAVE_STRUCT_TIMESPEC
 
 #define SOCKET_SIZE_TYPE socklen_t
 
@@ -521,14 +523,11 @@
 /* #undef strtok_r */
 /* #undef strtoll */
 /* #undef strtoull */
+/* #undef tzname */
 /* #undef vsnprintf */
 #if (_MSC_VER > 1310)
 # define HAVE_SETENV
 #define setenv(a,b,c) _putenv_s(a,b)
-#endif
-/* We don't want the min/max macros */
-#ifdef __WIN__
-#define NOMINMAX
 #endif
 
 /*
@@ -647,16 +646,16 @@
 
 #define MYSQL_VERSION_MAJOR 5
 #define MYSQL_VERSION_MINOR 6
-#define MYSQL_VERSION_PATCH 22
-#define MYSQL_VERSION_EXTRA "-71.0"
+#define MYSQL_VERSION_PATCH 34
+#define MYSQL_VERSION_EXTRA "-79.0"
 
 #define PACKAGE "mysql"
 #define PACKAGE_BUGREPORT ""
 #define PACKAGE_NAME "MySQL Server"
-#define PACKAGE_STRING "MySQL Server 5.6.22-71.0"
+#define PACKAGE_STRING "MySQL Server 5.6.34-79.0"
 #define PACKAGE_TARNAME "mysql"
-#define PACKAGE_VERSION "5.6.22-71.0"
-#define VERSION "5.6.22-71.0"
+#define PACKAGE_VERSION "5.6.34-79.0"
+#define VERSION "5.6.34-79.0"
 #define PROTOCOL_VERSION 10
 
 
@@ -669,5 +668,10 @@
 
 #define CPU_LEVEL1_DCACHE_LINESIZE 64
 
+/* #undef HAVE_LIBNUMA */
+
+/* For --secure-file-priv */
+#define DEFAULT_SECURE_FILE_PRIV_DIR "NULL"
+#define DEFAULT_SECURE_FILE_PRIV_EMBEDDED_DIR "NULL"
 
 #endif

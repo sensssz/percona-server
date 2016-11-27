@@ -27,7 +27,7 @@
 #
 # Change this to match the version of the shared libs you want to include
 #
-%define version_cur 5.6.22_71.0
+%define version_cur 5.6.34_79.0
 %define version41 4.1.17
 %define version40 4.0.26
 %define version3 3.23.58

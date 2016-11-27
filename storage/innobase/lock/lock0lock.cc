@@ -70,7 +70,7 @@ bitmap */
 #define LOCK_PAGE_BITMAP_MARGIN		64
 
 /** Lock scheduling algorithm */
-ulong innodb_lock_schedule_algorithm = INNODB_LOCK_SCHEDULE_ALGORITHM_FCFS;
+ulong innodb_lock_schedule_algorithm = INNODB_LOCK_SCHEDULE_ALGORITHM_VATS;
 
 /* An explicit record lock affects both the record and the gap before it.
 An implicit x-lock does not affect the gap, it only locks the index

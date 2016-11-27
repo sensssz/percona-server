@@ -21,7 +21,7 @@
 echo "Warning: $0 is deprecated and will be removed in a future version." 1>&2
 echo "Finding system information for a MySQL bug report"
 
-VERSION="5.6.22-71.0"
+VERSION="5.6.34-79.0"
 COMPILATION_COMMENT="Source distribution"
 BUGmysql="mysql@lists.mysql.com"
 # This is set by configure
