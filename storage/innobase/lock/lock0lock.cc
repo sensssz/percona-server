@@ -2549,7 +2549,7 @@ lock_grant(
 	lock_t*	lock,	/*!< in/out: waiting lock request */
     bool    owns_trx_mutex)
 {
-	ut_ad(lock_mutex_own() == owns_trx_mutex);
+	ut_ad(lock_mutex_own());
 
 	lock_reset_lock_and_trx_wait(lock);
 
