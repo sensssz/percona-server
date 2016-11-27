@@ -1830,7 +1830,7 @@ has_higher_priority(
   } else if (trx1->start_time_nano.tv_sec > trx2->start_time_nano.tv_sec) {
     return false;
   } else {
-    return trx1->start_time_nano.tv_nsec < trx2->start_time_nano.tv_nsec;
+    return trx1->start_time_nano.tv_nsec <= trx2->start_time_nano.tv_nsec;
   }
 }
 
