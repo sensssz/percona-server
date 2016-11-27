@@ -405,6 +405,25 @@ lock_grant(
 	lock_t*	lock,	/*!< in/out: waiting lock request */
     bool    owns_trx_mutex);
 
+/*********************************************************************//**
+Checks if a waiting record lock request still has to wait in a queue.
+@return	lock that is causing the wait */
+static
+const lock_t*
+lock_rec_has_to_wait_in_queue(
+/*==========================*/
+    const lock_t*	wait_lock);	/*!< in: waiting record lock */
+
+/*************************************************************//**
+Grants a lock to a waiting lock request and releases the waiting transaction.
+The caller must hold lock_sys->mutex but not lock->trx->mutex. */
+static
+void
+lock_grant(
+/*=======*/
+	lock_t*	lock,	/*!< in/out: waiting lock request */
+    bool    owns_trx_mutex);
+
 #ifdef UNIV_PFS_MUTEX
 /* Key to register mutex with performance schema */
 UNIV_INTERN mysql_pfs_key_t	lock_sys_mutex_key;
