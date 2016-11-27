@@ -1,4 +1,4 @@
-# Copyright (c) 2000, 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -54,10 +54,12 @@
 %global license_type          GPLv2
 %endif
 
+%global min                   5.6.10
+
 Name:           mysql-%{product_suffix}
 Summary:        A very fast and reliable SQL database server
 Group:          Applications/Databases
-Version:        5.6.22-71.0
+Version:        5.6.34-79.0
 Release:        1%{?dist}
 License:        Copyright (c) 2000, 2016, %{mysql_vendor}. All rights reserved. Under %{?license_type} license as shown in the Description field.
 Source0:        https://cdn.mysql.com/Downloads/MySQL-5.6/%{src_dir}.tar.gz
@@ -69,13 +71,13 @@ Source2:        mysqld.service
 Source3:        mysql.conf
 Source4:        my_config.h
 Source6:        mysql_config.sh
-Patch0:         mysql-5.6-libmysqlclient-symbols.patch
-Patch1:         mysql-5.6.16-mysql-install.patch
+Patch0:         mysql-5.6.16-mysql-install.patch
 BuildRequires:  cmake
 BuildRequires:  perl
 BuildRequires:  time
 BuildRequires:  libaio-devel
 BuildRequires:  ncurses-devel
+BuildRequires:  numactl-devel
 BuildRequires:  openssl-devel
 BuildRequires:  zlib-devel
 BuildRequires:  systemd
@@ -113,14 +115,15 @@ Requires:       shadow-utils
 Requires:       net-tools
 %if 0%{?commercial}
 Obsoletes:      mysql-community-server < %{version}-%{release}
-Requires:       mysql-commercial-client%{?_isa} = %{version}-%{release}
+Requires:       mysql-commercial-client%{?_isa} >= %{min}
 Requires:       mysql-commercial-common%{?_isa} = %{version}-%{release}
 %else
-Requires:       mysql-community-client%{?_isa} = %{version}-%{release}
+Requires:       mysql-community-client%{?_isa} >= %{min}
 Requires:       mysql-community-common%{?_isa} = %{version}-%{release}
 %endif
 Obsoletes:      mariadb-server
 Obsoletes:      mariadb-galera-server
+Obsoletes:      mariadb-server-galera
 Obsoletes:      community-mysql-server < %{version}-%{release}
 Obsoletes:      mysql-server < %{version}-%{release}
 Provides:       mysql-server = %{version}-%{release}
@@ -157,9 +160,9 @@ Summary:        MySQL database client applications and tools
 Group:          Applications/Databases
 %if 0%{?commercial}
 Obsoletes:      mysql-community-client < %{version}-%{release}
-Requires:       mysql-commercial-libs%{?_isa} = %{version}-%{release}
+Requires:       mysql-commercial-libs%{?_isa} >= %{min}
 %else
-Requires:       mysql-community-libs%{?_isa} = %{version}-%{release}
+Requires:       mysql-community-libs%{?_isa} >= %{min}
 %endif
 Obsoletes:      mariadb
 Obsoletes:      community-mysql < %{version}-%{release}
@@ -195,10 +198,10 @@ MySQL database server, and MySQL embedded server.
 Summary:        Test suite for the MySQL database server
 Group:          Applications/Databases
 %if 0%{?commercial}
-Requires:       mysql-commercial-server%{?_isa} = %{version}-%{release}
+Requires:       mysql-commercial-server%{?_isa} >= %{min}
 Obsoletes:      mysql-community-test < %{version}-%{release}
 %else
-Requires:       mysql-community-server%{?_isa} = %{version}-%{release}
+Requires:       mysql-community-server%{?_isa} >= %{min}
 %endif
 Obsoletes:      mariadb-test
 Obsoletes:      community-mysql-test < %{version}-%{release}
@@ -216,9 +219,9 @@ Summary:        MySQL benchmark suite
 Group:          Applications/Databases
 %if 0%{?commercial}
 Obsoletes:      mysql-community-bench < %{version}-%{release}
-Requires:       mysql-commercial-server%{?_isa} = %{version}-%{release}
+Requires:       mysql-commercial-server%{?_isa} >= %{min}
 %else
-Requires:       mysql-community-server%{?_isa} = %{version}-%{release}
+Requires:       mysql-community-server%{?_isa} >= %{min}
 %endif
 Obsoletes:      mariadb-bench
 Obsoletes:      community-mysql-bench < %{obs_ver}
@@ -235,9 +238,9 @@ Summary:        Development header files and libraries for MySQL database client
 Group:          Applications/Databases
 %if 0%{?commercial}
 Obsoletes:      mysql-community-devel < %{version}-%{release}
-Requires:       mysql-enterprise-libs%{?_isa} = %{version}-%{release}
+Requires:       mysql-commercial-libs%{?_isa} >= %{min}
 %else
-Requires:       mysql-community-libs%{?_isa} = %{version}-%{release}
+Requires:       mysql-community-libs%{?_isa} >= %{min}
 %endif
 Obsoletes:      mariadb-devel
 Obsoletes:      community-mysql-devel < %{obs_ver}
@@ -254,9 +257,9 @@ Summary:        Shared libraries for MySQL database client applications
 Group:          Applications/Databases
 %if 0%{?commercial}
 Obsoletes:      mysql-community-libs < %{version}-%{release}
-Requires:       mysql-commercial-common%{?_isa} = %{version}-%{release}
+Requires:       mysql-commercial-common%{?_isa} >= %{min}
 %else
-Requires:       mysql-community-common%{?_isa} = %{version}-%{release}
+Requires:       mysql-community-common%{?_isa} >= %{min}
 %endif
 Obsoletes:      mariadb-libs
 Obsoletes:      community-mysql-libs < %{version}-%{release}
@@ -281,7 +284,7 @@ Obsoletes:      mariadb-embedded
 Obsoletes:      community-mysql-embedded < %{version}-%{release}
 Obsoletes:      mysql-embedded < %{version}-%{release}
 Provides:       mysql-embedded = %{version}-%{release}
-Provides:       mysql-emdedded%{?_isa} = %{version}-%{release}
+Provides:       mysql-embedded%{?_isa} = %{version}-%{release}
 
 %description    embedded
 This package contains the MySQL server as an embedded library.
@@ -300,11 +303,11 @@ Summary:        Development header files and libraries for MySQL as an embeddabl
 Group:          Applications/Databases
 %if 0%{?commercial}
 Obsoletes:      mysql-community-embedded-devel < %{version}-%{release}
-Requires:       mysql-commercial-devel%{?_isa} = %{version}-%{release}
-Requires:       mysql-commercial-embedded%{?_isa} = %{version}-%{release}
+Requires:       mysql-commercial-devel%{?_isa} >= %{min}
+Requires:       mysql-commercial-embedded%{?_isa} >= %{min}
 %else
-Requires:       mysql-community-devel%{?_isa} = %{version}-%{release}
-Requires:       mysql-community-embedded%{?_isa} = %{version}-%{release}
+Requires:       mysql-community-devel%{?_isa} >= %{min}
+Requires:       mysql-community-embedded%{?_isa} >= %{min}
 %endif
 Obsoletes:      mariadb-embedded-devel
 Obsoletes:      community-mysql-embedded-devel < %{version}-%{release}
@@ -320,7 +323,6 @@ the embedded version of the MySQL server.
 %setup -q -T -a 0 -c -n %{src_dir}
 pushd %{src_dir}
 %patch0 -p1
-%patch1 -p1
 
 %build
 # Fail quickly and obviously if user tries to build as root
@@ -351,6 +353,7 @@ mkdir debug
            -DINSTALL_SQLBENCHDIR=share \
            -DMYSQL_UNIX_ADDR="%{mysqldatadir}/mysql.sock" \
            -DFEATURE_SET="%{feature_set}" \
+           -DWITH_SYMVER16=1 \
            -DWITH_EMBEDDED_SERVER=1 \
            -DWITH_EMBEDDED_SHARED_LIBRARY=1 \
            %{?ssl_option} \
@@ -376,6 +379,7 @@ mkdir release
            -DINSTALL_SQLBENCHDIR=share \
            -DMYSQL_UNIX_ADDR="%{mysqldatadir}/mysql.sock" \
            -DFEATURE_SET="%{feature_set}" \
+           -DWITH_SYMVER16=1 \
            -DWITH_EMBEDDED_SERVER=1 \
            -DWITH_EMBEDDED_SHARED_LIBRARY=1 \
            %{?ssl_option} \
@@ -392,6 +396,7 @@ MBD=$RPM_BUILD_DIR/%{src_dir}
 install -d -m 0755 %{buildroot}%{_datadir}/mysql/SELinux/RHEL4
 install -d -m 0755 %{buildroot}/var/lib/mysql
 install -d -m 0755 %{buildroot}/var/run/mysqld
+install -d -m 0750 %{buildroot}/var/lib/mysql-files
 
 # Install all binaries
 pushd $MBD/release
@@ -454,9 +459,10 @@ rm -r $(readlink var) var
     -c "MySQL Server" -u 27 mysql >/dev/null 2>&1 || :
 
 %post server
-datadir=$(/usr/bin/my_print_defaults server mysqld | grep '^--datadir=' | sed -n 's/--datadir=//p')
+datadir=$(/usr/bin/my_print_defaults server mysqld | grep '^--datadir=' | sed -n 's/--datadir=//p' | tail -n 1)
 /bin/chmod 0755 "$datadir" >/dev/null 2>&1 || :
 /bin/touch /var/log/mysqld.log >/dev/null 2>&1 || :
+/bin/chown mysql:mysql /var/log/mysqld.log >/dev/null 2>&1 || :
 %systemd_post mysqld.service
 /usr/bin/systemctl enable mysqld >/dev/null 2>&1 || :
 
@@ -544,6 +550,7 @@ datadir=$(/usr/bin/my_print_defaults server mysqld | grep '^--datadir=' | sed -n
 %attr(755, root, root) %{_libdir}/mysql/plugin/innodb_engine.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/libmemcached.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/mypluglib.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/mysql_no_login.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/semisync_master.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/semisync_slave.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/validate_password.so
@@ -553,6 +560,7 @@ datadir=$(/usr/bin/my_print_defaults server mysqld | grep '^--datadir=' | sed -n
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/innodb_engine.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/libmemcached.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/mypluglib.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/mysql_no_login.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/semisync_master.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/semisync_slave.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/validate_password.so
@@ -574,6 +582,7 @@ datadir=$(/usr/bin/my_print_defaults server mysqld | grep '^--datadir=' | sed -n
 %attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/logrotate.d/mysql
 %dir %attr(755, mysql, mysql) /var/lib/mysql
 %dir %attr(755, mysql, mysql) /var/run/mysqld
+%dir %attr(750, mysql, mysql) /var/lib/mysql-files
 
 %files common
 %defattr(-, root, root, -)
@@ -622,8 +631,6 @@ datadir=$(/usr/bin/my_print_defaults server mysqld | grep '^--datadir=' | sed -n
 %attr(755, root, root) %{_bindir}/mysqlimport
 %attr(755, root, root) %{_bindir}/mysqlshow
 %attr(755, root, root) %{_bindir}/mysqlslap
-%attr(755, root, root) %{_bindir}/mysql_config
-%attr(755, root, root) %{_bindir}/mysql_config-%{__isa_bits}
 %attr(755, root, root) %{_bindir}/mysql_config_editor
 
 %attr(644, root, root) %{_mandir}/man1/msql2mysql.1*
@@ -676,12 +683,14 @@ datadir=$(/usr/bin/my_print_defaults server mysqld | grep '^--datadir=' | sed -n
 %attr(755, root, root) %{_libdir}/mysql/plugin/auth_test_plugin.so
 %attr(644, root, root) %{_libdir}/mysql/plugin/daemon_example.ini
 %attr(755, root, root) %{_libdir}/mysql/plugin/libdaemon_example.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/test_udf_services.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/qa_auth_client.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/qa_auth_interface.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/qa_auth_server.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/auth.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/auth_test_plugin.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/libdaemon_example.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/test_udf_services.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/qa_auth_client.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/qa_auth_interface.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/qa_auth_server.so
@@ -713,6 +722,18 @@ datadir=$(/usr/bin/my_print_defaults server mysqld | grep '^--datadir=' | sed -n
 %attr(755, root, root) %{_libdir}/mysql/libmysqld.so
 
 %changelog
+* Mon Sep 26 2016 Balasubramanian Kandasamy <balasubramanian.kandasamy@oracle.com> - 5.6.34-1
+- Include mysql-files directory
+
+* Tue Jul 05 2016 Balasubramanian Kandasamy <balasubramanian.kandasamy@oracle.com> - 5.6.32-1
+- Remove mysql_config from client subpackage
+
+* Mon Mar 14 2016 Georgi Kodinov <georgi.kodinov@oracle.com> - 5.6.31-1
+- Add test_udf_services.so plugin
+
+* Wed Jan 14 2015 Balasubramanian Kandasamy <balasubramanian.kandasamy@oracle.com> - 5.6.24-1
+- Add mysql_no_login.so plugin
+
 * Mon Oct 06 2014 Balasubramanian Kandasamy <balasubramanian.kandasamy@oracle.com> - 5.6.22-1
 - Add license info in each subpackage
 - Remove systemd conditional

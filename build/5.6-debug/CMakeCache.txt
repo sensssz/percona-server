@@ -29,10 +29,20 @@ AUTOMAKE_EXECUTABLE:FILEPATH=/usr/bin/automake
 //path to the awk executable
 AWK_EXECUTABLE:FILEPATH=/usr/bin/gawk
 
+//Don't set this by hand.  It's used to tell the subcmake not to
+// set things
+BACKUP_HAS_PARENT:BOOL=ON
+
 BACKUP_TEST:BOOL=OFF
 
 //path to the bison executable
 BISON_EXECUTABLE:FILEPATH=/usr/bin/bison
+
+//CTest build name
+BUILDNAME:STRING=PerconaFT Debug Linux-3.10.0-229.el7.x86_64 x86_64 GNU c++ 4.8.5
+
+//Build the testing tree.
+BUILD_TESTING:BOOL=OFF
 
 //path to the executable
 BZR_EXECUTABLE:FILEPATH=BZR_EXECUTABLE-NOTFOUND
@@ -172,6 +182,9 @@ CMAKE_SKIP_RPATH:BOOL=NO
 //Path to a program.
 CMAKE_STRIP:FILEPATH=/usr/bin/strip
 
+//Revision of tokudb.
+CMAKE_TOKUDB_REVISION:STRING=0
+
 //If true, cmake will use relative paths in makefiles and projects.
 CMAKE_USE_RELATIVE_PATHS:BOOL=OFF
 
@@ -184,8 +197,17 @@ CMAKE_VERBOSE_MAKEFILE:BOOL=FALSE
 //Set to true if this is a community build
 COMMUNITY_BUILD:BOOL=ON
 
+//Path to a program.
+COVERAGE_COMMAND:FILEPATH=/usr/bin/gcov
+
 //Path to a library.
 CRYPTO_LIBRARY:FILEPATH=/usr/lib64/libcrypto.so
+
+//Path to a program.
+CSCOPE:FILEPATH=/usr/bin/cscope
+
+//Path to a program.
+CTAGS:FILEPATH=/usr/local/bin/ctags
 
 //Path to a file.
 CURSES_CURSES_H_PATH:PATH=/usr/include
@@ -253,6 +275,9 @@ ENABLE_MEMCACHED_SASL:BOOL=OFF
 //Enable SASL on InnoDB Memcached
 ENABLE_MEMCACHED_SASL_PWDB:BOOL=OFF
 
+//Path to a program.
+ETAGS:FILEPATH=/usr/local/bin/etags
+
 // Selection of features. Options are
 //\n - xsmall : 
 //\n - small: embedded
@@ -270,11 +295,29 @@ FORM_LIBRARY:FILEPATH=/usr/lib64/libform.so
 //Path to a program.
 GETCONF:FILEPATH=/usr/bin/getconf
 
+//git command line client
+GIT_EXECUTABLE:FILEPATH=/usr/bin/git
+
 //path to the executable
 GLIBTOOLIZE_EXECUTABLE:FILEPATH=GLIBTOOLIZE_EXECUTABLE-NOTFOUND
 
+//Path to a program.
+GTAGS:FILEPATH=GTAGS-NOTFOUND
+
 //path to the executable
 GTAR_EXECUTABLE:FILEPATH=/usr/bin/gtar
+
+//installed name of the hot backup library
+HOT_BACKUP_LIBNAME:STRING=HotBackup
+
+//Value Computed by CMake
+HotBackup_BINARY_DIR:STATIC=/home/jiamin/percona-server/build/5.6-debug/plugin/tokudb-backup-plugin/Percona-TokuBackup/backup
+
+//Dependencies for the target
+HotBackup_LIB_DEPENDS:STATIC=general;-lpthread;general;dl;general;rt;
+
+//Value Computed by CMake
+HotBackup_SOURCE_DIR:STATIC=/home/jiamin/percona-server/plugin/tokudb-backup-plugin/Percona-TokuBackup/backup
 
 //No help, variable specified on the command line.
 IGNORE_AIO_CHECK:UNINITIALIZED=true
@@ -331,6 +374,12 @@ INSTALL_SBINDIR:STRING=bin
 //SCRIPT installation directory
 INSTALL_SCRIPTDIR:STRING=scripts
 
+//SECURE_FILE_PRIV installation directory
+INSTALL_SECURE_FILE_PRIVDIR:STRING=NULL
+
+//SECURE_FILE_PRIV_EMBEDDED installation directory
+INSTALL_SECURE_FILE_PRIV_EMBEDDEDDIR:STRING=NULL
+
 //SHARE installation directory
 INSTALL_SHAREDIR:STRING=share
 
@@ -339,6 +388,18 @@ INSTALL_SQLBENCHDIR:STRING=.
 
 //SUPPORTFILES installation directory
 INSTALL_SUPPORTFILESDIR:STRING=support-files
+
+//Where to find jemalloc sources.
+JEMALLOC_SOURCE_DIR:FILEPATH=/home/jiamin/percona-server/storage/tokudb/PerconaFT/third_party/jemalloc
+
+//Path to a library.
+JEMALLOC_STATIC_LIBRARY:FILEPATH=JEMALLOC_STATIC_LIBRARY-NOTFOUND
+
+//Name of libtokufractaltree.so
+LIBTOKUDB:STRING=tokufractaltree
+
+//Name of libtokuportability.so
+LIBTOKUPORTABILITY:STRING=tokuportability
 
 //path to the executable
 LIBTOOLIZE_EXECUTABLE:FILEPATH=/usr/bin/libtoolize
@@ -349,6 +410,9 @@ MANUFACTURER:STRING=Built from Source
 
 //Sets the maximum number of indexes per table, default 64
 MAX_INDEXES:STRING=64
+
+//Path to a program.
+MKID:FILEPATH=MKID-NOTFOUND
 
 //default MySQL data directory
 MYSQL_DATADIR:PATH=/home/jiamin/mysql/data
@@ -380,6 +444,12 @@ OPENSSL_ROOT_DIR:PATH=/usr
 //Support tracing of Optimizer
 OPTIMIZER_TRACE:BOOL=ON
 
+//Allow profiling and debug
+PROFILING:BOOL=ON
+
+//Where to find sources for snappy.
+SNAPPY_SOURCE_DIR:FILEPATH=/home/jiamin/percona-server/storage/tokudb/PerconaFT/third_party/snappy-1.1.2
+
 //config directory (for my.cnf)
 SYSCONFDIR:PATH=/home/jiamin/mysql/etc
 
@@ -389,8 +459,44 @@ TAR_EXECUTABLE:FILEPATH=/usr/bin/tar
 //PATH to MySQL TMP dir. Defaults to the P_tmpdir macro in <stdio.h>
 TMPDIR:PATH=P_tmpdir
 
+//Path to data files for tests
+TOKUDB_DATA:FILEPATH=/home/jiamin/percona-server/storage/tokudb/PerconaFT/../tokudb.data
+
+//Enable paranoid asserts.
+TOKU_DEBUG_PARANOID:BOOL=OFF
+
+//Value Computed by CMake
+TokuDB_BINARY_DIR:STATIC=/home/jiamin/percona-server/build/5.6-debug/storage/tokudb/PerconaFT
+
+//Value Computed by CMake
+TokuDB_SOURCE_DIR:STATIC=/home/jiamin/percona-server/storage/tokudb/PerconaFT
+
+//Build the cscope database.
+USE_CSCOPE:BOOL=ON
+
+//Build the ctags database.
+USE_CTAGS:BOOL=ON
+
+//Build the etags database.
+USE_ETAGS:BOOL=ON
+
+//Use gcov for test coverage.
+USE_GCOV:BOOL=OFF
+
+//Build the gtags database.
+USE_GTAGS:BOOL=ON
+
+//Build the idutils database.
+USE_MKID:BOOL=ON
+
+//Build to run safely under valgrind (often slower).
+USE_VALGRIND:BOOL=OFF
+
 //Don't build EXAMPLE
 WITHOUT_EXAMPLE_STORAGE_ENGINE:BOOL=ON
+
+//Don't build SCALABILITY_METRICS
+WITHOUT_SCALABILITY_METRICS:BOOL=ON
 
 //OFF
 WITHOUT_SERVER:BOOL=OFF
@@ -460,6 +566,9 @@ WITH_LIBWRAP:BOOL=OFF
 //Additional linker flags for mysqld
 WITH_MYSQLD_LDFLAGS:STRING=
 
+//Explicitly set NUMA memory allocation policy
+WITH_NUMA:BOOL=ON
+
 //Build with Percona PAM plugin
 WITH_PAM:BOOL=OFF
 
@@ -477,6 +586,9 @@ WITH_QUERY_RESPONSE_TIME:BOOL=OFF
 
 WITH_SSL:STRING=yes
 
+//Export libmysqlclient_16 and libmysqlclient_18 symbol versions
+WITH_SYMVER16:BOOL=OFF
+
 //Compile MySQL with unit tests
 WITH_UNIT_TESTS:BOOL=ON
 
@@ -484,6 +596,9 @@ WITH_UNIT_TESTS:BOOL=ON
 WITH_VALGRIND:BOOL=OFF
 
 WITH_ZLIB:STRING=bundled
+
+//Where to find sources for xz (lzma).
+XZ_SOURCE_DIR:FILEPATH=/home/jiamin/percona-server/storage/tokudb/PerconaFT/third_party/xz-4.999.9beta
 
 //Dependencies for the target
 archive_LIB_DEPENDS:STATIC=general;-lpthread;general;zlib;
@@ -540,6 +655,15 @@ federated_LIB_DEPENDS:STATIC=general;-lpthread;
 federated_embedded_LIB_DEPENDS:STATIC=general;-lpthread;
 
 //Dependencies for the target
+ft_LIB_DEPENDS:STATIC=general;-lpthread;general;util_static;general;lzma;general;snappy;general;tokuportability;general;z;
+
+//Dependencies for the target
+ft_static_LIB_DEPENDS:STATIC=general;-lpthread;general;lzma;general;snappy;
+
+//Dependencies for the target
+ftcxx_LIB_DEPENDS:STATIC=general;-lpthread;
+
+//Dependencies for the target
 ftexample_LIB_DEPENDS:STATIC=general;-lpthread;general;mysqlservices;
 
 //Dependencies for the target
@@ -573,6 +697,12 @@ libmurmur_udf_LIB_DEPENDS:STATIC=general;-lpthread;general;mysqlservices;
 libmysql_LIB_DEPENDS:STATIC=general;-lpthread;general;clientlib;general;dbug;general;strings;general;vio;general;mysys;general;mysys_ssl;general;zlib;general;/usr/lib64/libssl.so;general;/usr/lib64/libcrypto.so;general;dl;general;dl;
 
 //Dependencies for the target
+locktree_LIB_DEPENDS:STATIC=general;-lpthread;general;ft;general;tokuportability;
+
+//Dependencies for the target
+locktree_static_LIB_DEPENDS:STATIC=general;-lpthread;
+
+//Dependencies for the target
 master_LIB_DEPENDS:STATIC=general;-lpthread;
 
 //Dependencies for the target
@@ -586,6 +716,9 @@ myisammrg_LIB_DEPENDS:STATIC=general;-lpthread;
 
 //Dependencies for the target
 myisammrg_embedded_LIB_DEPENDS:STATIC=general;-lpthread;
+
+//Dependencies for the target
+mysql_no_login_LIB_DEPENDS:STATIC=general;-lpthread;general;mysqlservices;
 
 //Dependencies for the target
 mysqlserver_LIB_DEPENDS:STATIC=general;-lpthread;general;-lpthread;general;m;general;rt;general;/usr/lib64/libssl.so;general;/usr/lib64/libcrypto.so;general;dl;general;crypt;general;aio;
@@ -616,6 +749,9 @@ perfschema_LIB_DEPENDS:STATIC=general;-lpthread;
 
 //Dependencies for the target
 perfschema_embedded_LIB_DEPENDS:STATIC=general;-lpthread;
+
+//Dependencies for the target
+pfs_server_stubs_LIB_DEPENDS:STATIC=general;-lpthread;
 
 //Dependencies for the target
 qa_auth_client_LIB_DEPENDS:STATIC=general;-lpthread;general;mysqlservices;
@@ -660,7 +796,40 @@ sqlgunitlib_LIB_DEPENDS:STATIC=general;-lpthread;
 strings_LIB_DEPENDS:STATIC=general;-lpthread;
 
 //Dependencies for the target
+test_udf_services_LIB_DEPENDS:STATIC=general;-lpthread;general;mysqlservices;
+
+//Dependencies for the target
+tokudb_LIB_DEPENDS:STATIC=general;-lpthread;general;mysqlservices;general;tokufractaltree_static;general;tokuportability_static;general;zlib;general;stdc++;
+
+//Dependencies for the target
+tokudb_backup_LIB_DEPENDS:STATIC=general;-lpthread;general;mysqlservices;
+
+//Dependencies for the target
+tokudb_static_conv_LIB_DEPENDS:STATIC=general;-lpthread;
+
+//Dependencies for the target
+tokufractaltree_LIB_DEPENDS:STATIC=general;-lpthread;general;locktree_static;general;ft_static;general;util_static;general;lzma;general;snappy;general;tokuportability;general;z;
+
+//Dependencies for the target
+tokufractaltree_static_LIB_DEPENDS:STATIC=general;-lpthread;general;-lpthread;general;-lpthread;general;-lpthread;general;-lpthread;
+
+//Dependencies for the target
+tokuportability_LIB_DEPENDS:STATIC=general;-lpthread;general;-lpthread;general;dl;general;rt;
+
+//Dependencies for the target
+tokuportability_static_LIB_DEPENDS:STATIC=general;-lpthread;general;-lpthread;general;-lpthread;general;dl;general;rt;
+
+//Dependencies for the target
+tokuportability_static_conv_LIB_DEPENDS:STATIC=general;-lpthread;
+
+//Dependencies for the target
 udf_example_LIB_DEPENDS:STATIC=general;-lpthread;general;mysqld;
+
+//Dependencies for the target
+util_LIB_DEPENDS:STATIC=general;-lpthread;general;tokuportability;general;-lpthread;general;dl;general;rt;
+
+//Dependencies for the target
+util_static_LIB_DEPENDS:STATIC=general;-lpthread;
 
 //Dependencies for the target
 validate_password_LIB_DEPENDS:STATIC=general;-lpthread;general;mysqlservices;
@@ -794,7 +963,7 @@ CMAKE_MODULE_LINKER_FLAGS_RELWITHDEBINFO-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_NM
 CMAKE_NM-ADVANCED:INTERNAL=1
 //number of local generators
-CMAKE_NUMBER_OF_LOCAL_GENERATORS:INTERNAL=62
+CMAKE_NUMBER_OF_LOCAL_GENERATORS:INTERNAL=83
 //ADVANCED property for variable: CMAKE_OBJCOPY
 CMAKE_OBJCOPY-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_OBJDUMP
@@ -852,6 +1021,10 @@ C_HAS_inline:INTERNAL=1
 DEBUGBUILDDIR:INTERNAL=/home/jiamin/percona-server/build/debug
 //ADVANCED property for variable: DEBUG_EXTNAME
 DEBUG_EXTNAME-ADVANCED:INTERNAL=1
+//default --secure-file-priv directory
+DEFAULT_SECURE_FILE_PRIV_DIR:INTERNAL="NULL"
+//default --secure-file-priv directory (for embedded library)
+DEFAULT_SECURE_FILE_PRIV_EMBEDDED_DIR:INTERNAL="NULL"
 //ADVANCED property for variable: DISABLE_SHARED
 DISABLE_SHARED-ADVANCED:INTERNAL=1
 //Have function clock_gettime
@@ -862,8 +1035,12 @@ DTRACE-ADVANCED:INTERNAL=1
 ENABLED_LOCAL_INFILE-ADVANCED:INTERNAL=1
 //Details about finding Curses
 FIND_PACKAGE_MESSAGE_DETAILS_Curses:INTERNAL=[/usr/lib64/libcurses.so][/usr/include][v()]
+//Details about finding Git
+FIND_PACKAGE_MESSAGE_DETAILS_Git:INTERNAL=[/usr/bin/git][v1.8.3.1()]
 //Details about finding Threads
 FIND_PACKAGE_MESSAGE_DETAILS_Threads:INTERNAL=[TRUE][v()]
+//Details about finding ZLIB
+FIND_PACKAGE_MESSAGE_DETAILS_ZLIB:INTERNAL=[zlib][/home/jiamin/percona-server/zlib][v1.2.3()]
 //Have symbol FIONREAD
 FIONREAD_IN_SYS_FILIO:INTERNAL=
 //Have symbol FIONREAD
@@ -872,12 +1049,16 @@ FIONREAD_IN_SYS_IOCTL:INTERNAL=1
 FORM_LIBRARY-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: GETCONF
 GETCONF-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: GIT_EXECUTABLE
+GIT_EXECUTABLE-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: GLIBTOOLIZE_EXECUTABLE
 GLIBTOOLIZE_EXECUTABLE-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: GTAR_EXECUTABLE
 GTAR_EXECUTABLE-ADVANCED:INTERNAL=1
 //Have symbol TIOCGWINSZ
 GWINSZ_IN_SYS_IOCTL:INTERNAL=1
+//Test HAVE_-Wno-error=strict-overflow
+HAVE_-Wno-error=strict-overflow:INTERNAL=
 //Have include aio.h
 HAVE_AIO_H:INTERNAL=1
 //Have function aio_read
@@ -904,16 +1085,26 @@ HAVE_BACKTRACE:INTERNAL=1
 HAVE_BACKTRACE_SYMBOLS:INTERNAL=1
 //Have function backtrace_symbols_fd
 HAVE_BACKTRACE_SYMBOLS_FD:INTERNAL=1
+//Have function backtrace
+HAVE_BACKTRACE_WITHOUT_EXECINFO:INTERNAL=1
+//Have includes bits/functexcept.h
+HAVE_BITS_FUNCTEXCEPT_H:INTERNAL=
 //Have function bmove
 HAVE_BMOVE:INTERNAL=
 //Have function bsearch
 HAVE_BSEARCH:INTERNAL=1
 //Test HAVE_BSS_START
 HAVE_BSS_START:INTERNAL=1
+//Have include byteswap.h
+HAVE_BYTESWAP_H:INTERNAL=1
 //Have function chown
 HAVE_CHOWN:INTERNAL=1
 //Have function clock_gettime
 HAVE_CLOCK_GETTIME:INTERNAL=1
+//Have symbol CLOCK_REALTIME
+HAVE_CLOCK_MONOTONIC:INTERNAL=1
+//Have symbol CLOCK_REALTIME
+HAVE_CLOCK_REALTIME:INTERNAL=1
 //Result of TRY_COMPILE
 HAVE_CMAKE_SIZEOF_UNSIGNED_SHORT:INTERNAL=TRUE
 //Have function compress
@@ -927,6 +1118,130 @@ HAVE_CURSES_H:INTERNAL=1
 HAVE_CUSERID:INTERNAL=1
 //Have includes cxxabi.h
 HAVE_CXXABI_H:INTERNAL=
+//Test HAVE_CXX_-Wbad-function-cast
+HAVE_CXX_-Wbad-function-cast:INTERNAL=
+//Test HAVE_CXX_-Wcast-align
+HAVE_CXX_-Wcast-align:INTERNAL=
+//Test HAVE_CXX_-Wextra
+HAVE_CXX_-Wextra:INTERNAL=
+//Test HAVE_CXX_-Winit-self
+HAVE_CXX_-Winit-self:INTERNAL=
+//Test HAVE_CXX_-Wlogical-op
+HAVE_CXX_-Wlogical-op:INTERNAL=
+//Test HAVE_CXX_-Wmissing-declarations
+HAVE_CXX_-Wmissing-declarations:INTERNAL=
+//Test HAVE_CXX_-Wmissing-format-attribute
+HAVE_CXX_-Wmissing-format-attribute:INTERNAL=
+//Test HAVE_CXX_-Wmissing-prototypes
+HAVE_CXX_-Wmissing-prototypes:INTERNAL=
+//Test HAVE_CXX_-Wno-error=address-of-array-temporary
+HAVE_CXX_-Wno-error=address-of-array-temporary:INTERNAL=
+//Test HAVE_CXX_-Wno-error=extern-c-compat
+HAVE_CXX_-Wno-error=extern-c-compat:INTERNAL=
+//Test HAVE_CXX_-Wno-error=maybe-uninitialized
+HAVE_CXX_-Wno-error=maybe-uninitialized:INTERNAL=
+//Test HAVE_CXX_-Wno-error=missing-format-attribute
+HAVE_CXX_-Wno-error=missing-format-attribute:INTERNAL=
+//Test HAVE_CXX_-Wno-error=nonnull-compare
+HAVE_CXX_-Wno-error=nonnull-compare:INTERNAL=
+//Test HAVE_CXX_-Wno-error=strict-overflow
+HAVE_CXX_-Wno-error=strict-overflow:INTERNAL=
+//Test HAVE_CXX_-Wno-error=tautological-constant-out-of-range-compare
+HAVE_CXX_-Wno-error=tautological-constant-out-of-range-compare:INTERNAL=
+//Test HAVE_CXX_-Wno-ignored-attributes
+HAVE_CXX_-Wno-ignored-attributes:INTERNAL=
+//Test HAVE_CXX_-Wno-missing-field-initializers
+HAVE_CXX_-Wno-missing-field-initializers:INTERNAL=
+//Test HAVE_CXX_-Wno-missing-noreturn
+HAVE_CXX_-Wno-missing-noreturn:INTERNAL=
+//Test HAVE_CXX_-Wno-pointer-bool-conversion
+HAVE_CXX_-Wno-pointer-bool-conversion:INTERNAL=
+//Test HAVE_CXX_-Wpacked
+HAVE_CXX_-Wpacked:INTERNAL=
+//Test HAVE_CXX_-Wpointer-arith
+HAVE_CXX_-Wpointer-arith:INTERNAL=
+//Test HAVE_CXX_-Wshadow
+HAVE_CXX_-Wshadow:INTERNAL=
+//Test HAVE_CXX_-Wstrict-null-sentinel
+HAVE_CXX_-Wstrict-null-sentinel:INTERNAL=
+//Test HAVE_CXX_-Wstrict-prototypes
+HAVE_CXX_-Wstrict-prototypes:INTERNAL=
+//Test HAVE_CXX_-Wswitch
+HAVE_CXX_-Wswitch:INTERNAL=
+//Test HAVE_CXX_-Wtrampolines
+HAVE_CXX_-Wtrampolines:INTERNAL=
+//Test HAVE_CXX_-fno-exceptions
+HAVE_CXX_-fno-exceptions:INTERNAL=
+//Test HAVE_CXX_-fno-omit-frame-pointer
+HAVE_CXX_-fno-omit-frame-pointer:INTERNAL=
+//Test HAVE_CXX_-fno-rtti
+HAVE_CXX_-fno-rtti:INTERNAL=
+//Test HAVE_CXX__Wno_missing_field_initializers
+HAVE_CXX__Wno_missing_field_initializers:INTERNAL=1
+//Test HAVE_CXX__Wno_vla
+HAVE_CXX__Wno_vla:INTERNAL=1
+//Test HAVE_C_-Wbad-function-cast
+HAVE_C_-Wbad-function-cast:INTERNAL=
+//Test HAVE_C_-Wcast-align
+HAVE_C_-Wcast-align:INTERNAL=
+//Test HAVE_C_-Wextra
+HAVE_C_-Wextra:INTERNAL=
+//Test HAVE_C_-Winit-self
+HAVE_C_-Winit-self:INTERNAL=
+//Test HAVE_C_-Wlogical-op
+HAVE_C_-Wlogical-op:INTERNAL=
+//Test HAVE_C_-Wmissing-declarations
+HAVE_C_-Wmissing-declarations:INTERNAL=
+//Test HAVE_C_-Wmissing-format-attribute
+HAVE_C_-Wmissing-format-attribute:INTERNAL=
+//Test HAVE_C_-Wmissing-prototypes
+HAVE_C_-Wmissing-prototypes:INTERNAL=
+//Test HAVE_C_-Wno-error=address-of-array-temporary
+HAVE_C_-Wno-error=address-of-array-temporary:INTERNAL=
+//Test HAVE_C_-Wno-error=extern-c-compat
+HAVE_C_-Wno-error=extern-c-compat:INTERNAL=
+//Test HAVE_C_-Wno-error=maybe-uninitialized
+HAVE_C_-Wno-error=maybe-uninitialized:INTERNAL=
+//Test HAVE_C_-Wno-error=missing-format-attribute
+HAVE_C_-Wno-error=missing-format-attribute:INTERNAL=
+//Test HAVE_C_-Wno-error=nonnull-compare
+HAVE_C_-Wno-error=nonnull-compare:INTERNAL=
+//Test HAVE_C_-Wno-error=strict-overflow
+HAVE_C_-Wno-error=strict-overflow:INTERNAL=
+//Test HAVE_C_-Wno-error=tautological-constant-out-of-range-compare
+HAVE_C_-Wno-error=tautological-constant-out-of-range-compare:INTERNAL=
+//Test HAVE_C_-Wno-ignored-attributes
+HAVE_C_-Wno-ignored-attributes:INTERNAL=
+//Test HAVE_C_-Wno-missing-field-initializers
+HAVE_C_-Wno-missing-field-initializers:INTERNAL=
+//Test HAVE_C_-Wno-missing-noreturn
+HAVE_C_-Wno-missing-noreturn:INTERNAL=
+//Test HAVE_C_-Wno-pointer-bool-conversion
+HAVE_C_-Wno-pointer-bool-conversion:INTERNAL=
+//Test HAVE_C_-Wpacked
+HAVE_C_-Wpacked:INTERNAL=
+//Test HAVE_C_-Wpointer-arith
+HAVE_C_-Wpointer-arith:INTERNAL=
+//Test HAVE_C_-Wshadow
+HAVE_C_-Wshadow:INTERNAL=
+//Test HAVE_C_-Wstrict-null-sentinel
+HAVE_C_-Wstrict-null-sentinel:INTERNAL=
+//Test HAVE_C_-Wstrict-prototypes
+HAVE_C_-Wstrict-prototypes:INTERNAL=
+//Test HAVE_C_-Wswitch
+HAVE_C_-Wswitch:INTERNAL=
+//Test HAVE_C_-Wtrampolines
+HAVE_C_-Wtrampolines:INTERNAL=
+//Test HAVE_C_-fno-exceptions
+HAVE_C_-fno-exceptions:INTERNAL=
+//Test HAVE_C_-fno-omit-frame-pointer
+HAVE_C_-fno-omit-frame-pointer:INTERNAL=
+//Test HAVE_C_-fno-rtti
+HAVE_C_-fno-rtti:INTERNAL=
+//Test HAVE_C__Wno_missing_field_initializers
+HAVE_C__Wno_missing_field_initializers:INTERNAL=1
+//Test HAVE_C__Wno_vla
+HAVE_C__Wno_vla:INTERNAL=1
 //Have symbol fdatasync
 HAVE_DECL_FDATASYNC:INTERNAL=1
 //Have symbol madvise
@@ -947,8 +1262,14 @@ HAVE_DLERROR:INTERNAL=1
 HAVE_DLFCN_H:INTERNAL=1
 //Have function dlopen
 HAVE_DLOPEN:INTERNAL=1
+//Have function dlsym
+HAVE_DLSYM_WITHOUT_DL:INTERNAL=
+//Have function dlsym
+HAVE_DLSYM_WITH_DL:INTERNAL=1
 //Have function _doprnt
 HAVE_DOPRNT:INTERNAL=
+//Have include endian.h
+HAVE_ENDIAN_H:INTERNAL=1
 //Have function epoll_create
 HAVE_EPOLL:INTERNAL=1
 //Have function epoll_ctl
@@ -1000,6 +1321,8 @@ HAVE_FSYNC:INTERNAL=1
 HAVE_FTIME:INTERNAL=1
 //Have function ftruncate
 HAVE_FTRUNCATE:INTERNAL=1
+//Have symbol F_NOCACHE
+HAVE_F_NOCACHE:INTERNAL=
 //Test HAVE_GCC_ATOMIC_BUILTINS
 HAVE_GCC_ATOMIC_BUILTINS:INTERNAL=1
 //Test HAVE_GETADDRINFO
@@ -1042,6 +1365,8 @@ HAVE_GETUID:INTERNAL=1
 HAVE_GETWD:INTERNAL=1
 //Have function gmtime_r
 HAVE_GMTIME_R:INTERNAL=1
+//Test HAVE_GNU_TLS
+HAVE_GNU_TLS:INTERNAL=1
 //Have include grp.h
 HAVE_GRP_H:INTERNAL=1
 //Have function ntohll
@@ -1072,6 +1397,12 @@ HAVE_IB_GCC_ATOMIC_BUILTINS_BYTE_EXITCODE:INTERNAL=0
 HAVE_IB_GCC_ATOMIC_BUILTINS_COMPILED:INTERNAL=TRUE
 //Result of TRY_RUN
 HAVE_IB_GCC_ATOMIC_BUILTINS_EXITCODE:INTERNAL=0
+//Test HAVE_IB_GCC_ATOMIC_TEST_AND_SET
+HAVE_IB_GCC_ATOMIC_TEST_AND_SET:INTERNAL=1
+//Result of TRY_COMPILE
+HAVE_IB_GCC_ATOMIC_TEST_AND_SET_COMPILED:INTERNAL=TRUE
+//Result of TRY_RUN
+HAVE_IB_GCC_ATOMIC_TEST_AND_SET_EXITCODE:INTERNAL=0
 //Test HAVE_IB_GCC_ATOMIC_THREAD_FENCE
 HAVE_IB_GCC_ATOMIC_THREAD_FENCE:INTERNAL=1
 //Result of TRY_COMPILE
@@ -1119,6 +1450,10 @@ HAVE_LDIV:INTERNAL=1
 HAVE_LIBAIO:INTERNAL=1
 //Have include libaio.h
 HAVE_LIBAIO_H:INTERNAL=1
+//Have includes libkern/OSAtomic.h
+HAVE_LIBKERN_OSATOMIC_H:INTERNAL=
+//Have includes libkern/OSByteOrder.h
+HAVE_LIBKERN_OSBYTEORDER_H:INTERNAL=
 //Have include limits.h
 HAVE_LIMITS_H:INTERNAL=1
 //Test HAVE_LLVM_LIBCPP
@@ -1139,12 +1474,24 @@ HAVE_LONGJMP:INTERNAL=1
 HAVE_LRAND48:INTERNAL=1
 //Have function lstat
 HAVE_LSTAT:INTERNAL=1
+//Have includes machine/endian.h
+HAVE_MACHINE_ENDIAN_H:INTERNAL=
 //Have function madvise
 HAVE_MADVISE:INTERNAL=1
 //Have include malloc.h
 HAVE_MALLOC_H:INTERNAL=1
 //Have function malloc_info
 HAVE_MALLOC_INFO:INTERNAL=1
+//Have includes malloc/malloc.h
+HAVE_MALLOC_MALLOC_H:INTERNAL=
+//Have includes malloc_np.h
+HAVE_MALLOC_NP_H:INTERNAL=
+//Have function malloc_size
+HAVE_MALLOC_SIZE:INTERNAL=
+//Have function malloc_usable_size
+HAVE_MALLOC_USABLE_SIZE:INTERNAL=1
+//Have symbol MAP_ANONYMOUS
+HAVE_MAP_ANONYMOUS:INTERNAL=1
 //Have function mbrlen
 HAVE_MBRLEN:INTERNAL=1
 //Have function mbrtowc
@@ -1161,6 +1508,8 @@ HAVE_MEMCPY:INTERNAL=1
 HAVE_MEMMOVE:INTERNAL=1
 //Have include memory.h
 HAVE_MEMORY_H:INTERNAL=1
+//Have function mincore
+HAVE_MINCORE:INTERNAL=1
 //Have function mkstemp
 HAVE_MKSTEMP:INTERNAL=1
 //Have function mlock
@@ -1173,6 +1522,8 @@ HAVE_MMAP:INTERNAL=1
 HAVE_MMAP64:INTERNAL=1
 //Have mysys timer-related functions
 HAVE_MY_TIMER:INTERNAL=1
+//Have symbol M_MMAP_THRESHOLD
+HAVE_M_MMAP_THRESHOLD:INTERNAL=1
 //Have includes ndir.h
 HAVE_NDIR_H:INTERNAL=
 //Have include netinet/in6.h
@@ -1181,6 +1532,12 @@ HAVE_NETINET_IN6_H:INTERNAL=
 HAVE_NETINET_IN_H:INTERNAL=1
 //Have function nl_langinfo
 HAVE_NL_LANGINFO:INTERNAL=1
+//Have function nrand48
+HAVE_NRAND48:INTERNAL=1
+//Have includes numaif.h
+HAVE_NUMAIF_H:INTERNAL=
+//Have symbol O_DIRECT
+HAVE_O_DIRECT:INTERNAL=1
 //Have include paths.h
 HAVE_PATHS_H:INTERNAL=1
 //Test HAVE_PAUSE_INSTRUCTION
@@ -1213,6 +1570,10 @@ HAVE_POSIX_TIMERS:INTERNAL=1
 HAVE_PREAD:INTERNAL=1
 //Have function printstack
 HAVE_PRINTSTACK:INTERNAL=
+//Have symbol PR_SET_PTRACER
+HAVE_PR_SET_PTRACER:INTERNAL=1
+//Have symbol PR_SET_PTRACER_ANY
+HAVE_PR_SET_PTRACER_ANY:INTERNAL=1
 //Have function pthread_attr_create
 HAVE_PTHREAD_ATTR_CREATE:INTERNAL=
 //Have function pthread_attr_getguardsize
@@ -1227,16 +1588,26 @@ HAVE_PTHREAD_ATTR_SETSTACKSIZE:INTERNAL=1
 HAVE_PTHREAD_CONDATTR_CREATE:INTERNAL=
 //Have function pthread_condattr_setclock
 HAVE_PTHREAD_CONDATTR_SETCLOCK:INTERNAL=1
+//Have function pthread_getthreadid_np
+HAVE_PTHREAD_GETTHREADID_NP:INTERNAL=
+//Have include pthread.h
+HAVE_PTHREAD_H:INTERNAL=1
 //Have function pthread_key_delete
 HAVE_PTHREAD_KEY_DELETE:INTERNAL=1
+//Have includes pthread_np.h
+HAVE_PTHREAD_NP_H:INTERNAL=
 //Test HAVE_PTHREAD_ONCE_INIT
 HAVE_PTHREAD_ONCE_INIT:INTERNAL=1
+//Have function pthread_rwlockattr_setkind_np
+HAVE_PTHREAD_RWLOCKATTR_SETKIND_NP:INTERNAL=1
 //Have function pthread_rwlock_rdlock
 HAVE_PTHREAD_RWLOCK_RDLOCK:INTERNAL=1
 //Have function pthread_sigmask
 HAVE_PTHREAD_SIGMASK:INTERNAL=1
 //Have function pthread_threadmask
 HAVE_PTHREAD_THREADMASK:INTERNAL=
+//Have function pthread_yield
+HAVE_PTHREAD_YIELD:INTERNAL=1
 //Have function pthread_yield_np
 HAVE_PTHREAD_YIELD_NP:INTERNAL=
 //Test HAVE_PTHREAD_YIELD_ZERO_ARG
@@ -1245,6 +1616,8 @@ HAVE_PTHREAD_YIELD_ZERO_ARG:INTERNAL=1
 HAVE_PUTENV:INTERNAL=1
 //Have include pwd.h
 HAVE_PWD_H:INTERNAL=1
+//Have function random_r
+HAVE_RANDOM_R:INTERNAL=1
 //Have function rdtscll
 HAVE_RDTSCLL:INTERNAL=
 //Have function readdir_r
@@ -1356,6 +1729,8 @@ HAVE_SIZEOF_SOCKADDR_IN6:INTERNAL=TRUE
 //Result of TRY_COMPILE
 HAVE_SIZEOF_SOCKLEN_T:INTERNAL=TRUE
 //Result of TRY_COMPILE
+HAVE_SIZEOF_STRUCT_TIMESPEC:INTERNAL=TRUE
+//Result of TRY_COMPILE
 HAVE_SIZEOF_TIME_T:INTERNAL=TRUE
 //Result of TRY_COMPILE
 HAVE_SIZEOF_UCHAR:INTERNAL=FALSE
@@ -1397,6 +1772,10 @@ HAVE_SOCKET_SIZE_T_AS_socklen_t:INTERNAL=1
 HAVE_SOLARIS_STYLE_GETHOST:INTERNAL=
 //Have include stdarg.h
 HAVE_STDARG_H:INTERNAL=1
+//Test HAVE_STDCXX0X
+HAVE_STDCXX0X:INTERNAL=1
+//Test HAVE_STDCXX11
+HAVE_STDCXX11:INTERNAL=1
 //Have include stddef.h
 HAVE_STDDEF_H:INTERNAL=1
 //Have include stdint.h
@@ -1449,6 +1828,8 @@ HAVE_STRUNVIS:INTERNAL=
 HAVE_STRVIS:INTERNAL=
 //Have includes synch.h
 HAVE_SYNCH_H:INTERNAL=
+//Have include syscall.h
+HAVE_SYSCALL_H:INTERNAL=1
 //Have includes sysent.h
 HAVE_SYSENT_H:INTERNAL=
 //Have include sys/cdefs.h
@@ -1457,6 +1838,8 @@ HAVE_SYS_CDEFS_H:INTERNAL=1
 HAVE_SYS_DEVPOLL_H:INTERNAL=
 //Have include sys/types.h;sys/dir.h
 HAVE_SYS_DIR_H:INTERNAL=1
+//Have includes sys/endian.h
+HAVE_SYS_ENDIAN_H:INTERNAL=
 //Have include sys/epoll.h
 HAVE_SYS_EPOLL_H:INTERNAL=1
 //Have includes sys/event.h
@@ -1493,10 +1876,18 @@ HAVE_SYS_SELECT_H:INTERNAL=1
 HAVE_SYS_SHM_H:INTERNAL=1
 //Have include sys/socket.h
 HAVE_SYS_SOCKET_H:INTERNAL=1
+//Have include sys/statvfs.h
+HAVE_SYS_STATVFS_H:INTERNAL=1
 //Have include sys/stat.h
 HAVE_SYS_STAT_H:INTERNAL=1
 //Have includes sys/stream.h
 HAVE_SYS_STREAM_H:INTERNAL=
+//Have include sys/syscall.h
+HAVE_SYS_SYSCALL_H:INTERNAL=1
+//Have include sys/sysctl.h
+HAVE_SYS_SYSCTL_H:INTERNAL=1
+//Have includes sys/syslimits.h
+HAVE_SYS_SYSLIMITS_H:INTERNAL=
 //Have includes sys/termcap.h
 HAVE_SYS_TERMCAP_H:INTERNAL=
 //Have include time.h;sys/timeb.h
@@ -1665,6 +2056,10 @@ INSTALL_PLUGINTESTDIR-ADVANCED:INTERNAL=1
 INSTALL_SBINDIR-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: INSTALL_SCRIPTDIR
 INSTALL_SCRIPTDIR-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: INSTALL_SECURE_FILE_PRIVDIR
+INSTALL_SECURE_FILE_PRIVDIR-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: INSTALL_SECURE_FILE_PRIV_EMBEDDEDDIR
+INSTALL_SECURE_FILE_PRIV_EMBEDDEDDIR-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: INSTALL_SHAREDIR
 INSTALL_SHAREDIR-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: INSTALL_SQLBENCHDIR
@@ -1686,6 +2081,10 @@ MYSQL_DOCS_LOCATION-ADVANCED:INTERNAL=1
 MYSQL_PROJECT_NAME-ADVANCED:INTERNAL=1
 OLD_INSTALL_LAYOUT:INTERNAL=STANDALONE
 PLUGIN_REPOS:INTERNAL=
+//Test PTHREAD_YIELD_RETURNS_INT
+PTHREAD_YIELD_RETURNS_INT:INTERNAL=1
+//Have correct prototype for pthread_yield
+PTHREAD_YIELD_RETURNS_VOID:INTERNAL=0
 //Test QSORT_TYPE_IS_VOID
 QSORT_TYPE_IS_VOID:INTERNAL=1
 //Test SIGNAL_RETURN_TYPE_IS_VOID
@@ -1730,6 +2129,8 @@ SIZEOF_SIZE_T:INTERNAL=8
 SIZEOF_SOCKADDR_IN6:INTERNAL=28
 //CHECK_TYPE_SIZE: sizeof(socklen_t)
 SIZEOF_SOCKLEN_T:INTERNAL=4
+//CHECK_TYPE_SIZE: sizeof(struct timespec)
+SIZEOF_STRUCT_TIMESPEC:INTERNAL=16
 //CHECK_TYPE_SIZE: sizeof(time_t)
 SIZEOF_TIME_T:INTERNAL=8
 //CHECK_TYPE_SIZE: uchar unknown
@@ -1778,6 +2179,8 @@ TIME_T_UNSIGNED:INTERNAL=
 TIME_WITH_SYS_TIME:INTERNAL=1
 //Have symbol TIOCSTAT
 TIOCSTAT_IN_SYS_IOCTL:INTERNAL=
+//Test TOKUDB_OK
+TOKUDB_OK:INTERNAL=1
 //ADVANCED property for variable: WITHOUT_EXAMPLE_STORAGE_ENGINE
 WITHOUT_EXAMPLE_STORAGE_ENGINE-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: WITHOUT_SERVER
@@ -1798,6 +2201,8 @@ WITH_MYISAM_STORAGE_ENGINE:INTERNAL=ON
 WITH_MYSQLD_LDFLAGS-ADVANCED:INTERNAL=1
 //Result of TEST_BIG_ENDIAN
 WORDS_BIGENDIAN:INTERNAL=0
+//ADVANCED property for variable: ZLIB_LIBRARY
+ZLIB_LIBRARY-ADVANCED:INTERNAL=1
 //Bundled zlib library
 ZLIB_LIBRARY:INTERNAL=zlib
 

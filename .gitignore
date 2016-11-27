@@ -321,6 +321,7 @@ bkpull.log.5
 bkpull.log.6
 bkpush.log
 bkpush.log*
+build/
 build.log
 build_tags.sh
 client/#mysql.cc#

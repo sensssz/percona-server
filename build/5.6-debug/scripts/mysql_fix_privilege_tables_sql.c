@@ -4,7 +4,6 @@
 */
 const char* mysql_fix_privilege_tables[]={
 "set sql_mode='';\n",
-"set storage_engine=myisam;\n",
 "CREATE TABLE IF NOT EXISTS db (   Host char(60) binary DEFAULT '' NOT NULL, Db char(64) binary DEFAULT '' NOT NULL, User"
   " char(16) binary DEFAULT '' NOT NULL, Select_priv enum('N','Y') COLLATE utf8_general_ci DEFAULT 'N' NOT NULL, Insert_p"
   "riv enum('N','Y') COLLATE utf8_general_ci DEFAULT 'N' NOT NULL, Update_priv enum('N','Y') COLLATE utf8_general_ci DEFA"
@@ -44,9 +43,9 @@ const char* mysql_fix_privilege_tables[]={
   "um('','ANY','X509', 'SPECIFIED') COLLATE utf8_general_ci DEFAULT '' NOT NULL, ssl_cipher BLOB NOT NULL, x509_issuer BL"
   "OB NOT NULL, x509_subject BLOB NOT NULL, max_questions int(11) unsigned DEFAULT 0  NOT NULL, max_updates int(11) unsig"
   "ned DEFAULT 0  NOT NULL, max_connections int(11) unsigned DEFAULT 0  NOT NULL, max_user_connections int(11) unsigned D"
-  "EFAULT 0  NOT NULL, plugin char(64) DEFAULT '', authentication_string TEXT, password_expired ENUM('N', 'Y') COLLATE ut"
-  "f8_general_ci DEFAULT 'N' NOT NULL, PRIMARY KEY Host (Host,User) ) engine=MyISAM CHARACTER SET utf8 COLLATE utf8_bin c"
-  "omment='Users and global privileges';\n",
+  "EFAULT 0  NOT NULL, plugin char(64) DEFAULT 'mysql_native_password', authentication_string TEXT, password_expired ENUM"
+  "('N', 'Y') COLLATE utf8_general_ci DEFAULT 'N' NOT NULL, PRIMARY KEY Host (Host,User) ) engine=MyISAM CHARACTER SET ut"
+  "f8 COLLATE utf8_bin comment='Users and global privileges';\n",
 "set @had_user_table= @@warning_count != 0;\n",
 "CREATE TABLE IF NOT EXISTS func (  name char(64) binary DEFAULT '' NOT NULL, ret tinyint(1) DEFAULT '0' NOT NULL, dl cha"
   "r(128) DEFAULT '' NOT NULL, type enum ('function','aggregate') COLLATE utf8_general_ci NOT NULL, PRIMARY KEY (name) ) "
@@ -56,7 +55,7 @@ const char* mysql_fix_privilege_tables[]={
 "CREATE TABLE IF NOT EXISTS servers ( Server_name char(64) NOT NULL DEFAULT '', Host char(64) NOT NULL DEFAULT '', Db cha"
   "r(64) NOT NULL DEFAULT '', Username char(64) NOT NULL DEFAULT '', Password char(64) NOT NULL DEFAULT '', Port INT(4) N"
   "OT NULL DEFAULT '0', Socket char(64) NOT NULL DEFAULT '', Wrapper char(64) NOT NULL DEFAULT '', Owner char(64) NOT NUL"
-  "L DEFAULT '', PRIMARY KEY (Server_name)) CHARACTER SET utf8 comment='MySQL Foreign Servers table';\n",
+  "L DEFAULT '', PRIMARY KEY (Server_name)) engine=MyISAM CHARACTER SET utf8 comment='MySQL Foreign Servers table';\n",
 "CREATE TABLE IF NOT EXISTS tables_priv ( Host char(60) binary DEFAULT '' NOT NULL, Db char(64) binary DEFAULT '' NOT NUL"
   "L, User char(16) binary DEFAULT '' NOT NULL, Table_name char(64) binary DEFAULT '' NOT NULL, Grantor char(77) DEFAULT "
   "'' NOT NULL, Timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, Table_priv set('Selec"
@@ -2112,8 +2111,11 @@ const char* mysql_fix_privilege_tables[]={
 "EXECUTE stmt;\n",
 "DROP PREPARE stmt;\n",
 "drop procedure mysql.die;\n",
-"ALTER TABLE user ADD plugin char(64) DEFAULT '',  ADD authentication_string TEXT;\n",
-"ALTER TABLE user MODIFY plugin char(64) DEFAULT '';\n",
+"ALTER TABLE user ADD plugin char(64) DEFAULT 'mysql_native_password',  ADD authentication_string TEXT;\n",
+"ALTER TABLE user MODIFY plugin char(64) DEFAULT 'mysql_native_password';\n",
+"UPDATE user SET plugin=IF((length(password) = 41) OR (length(password) = 0), 'mysql_native_password', '') WHERE plugin ="
+  " '';\n",
+"UPDATE user SET plugin=IF(length(password) = 16, 'mysql_old_password', '') WHERE plugin = '';\n",
 "ALTER TABLE user MODIFY authentication_string TEXT;\n",
 "SET @hadPasswordExpired:=0;\n",
 "SELECT @hadPasswordExpired:=1 FROM user WHERE password_expired LIKE '%';\n",
