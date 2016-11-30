@@ -4930,7 +4930,7 @@ released:
                 wait_locks.push_back(lock);
             }
         }
-        std::sort(wait_locks.begin, wait_locks.end(), has_higher_priority);
+        std::sort(wait_locks.begin(), wait_locks.end(), has_higher_priority);
         for (auto lock : wait_locks) {
             if (!lock_rec_has_to_wait_granted(lock, granted_locks)) {
                 lock_grant(lock, false);
