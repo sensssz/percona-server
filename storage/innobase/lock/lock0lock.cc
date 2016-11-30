@@ -2801,23 +2801,25 @@ lock_rec_dequeue_from_page(
 //                }
 //                fprintf(stderr, "]\nAfter sorting: [");
 //            }
-            fcfs_granted = granted_locks;
-            vats_granted = granted_locks;
-            for (i = 0; i < wait_locks.size(); ++i) {
-                lock = wait_locks[i];
-                if (!lock_rec_has_to_wait_granted(lock, fcfs_granted)) {
-                    fcfs_granted.push_back(lock);
+            if (wait_locks.size() > 1) {
+                fcfs_granted = granted_locks;
+                vats_granted = granted_locks;
+                for (i = 0; i < wait_locks.size(); ++i) {
+                    lock = wait_locks[i];
+                    if (!lock_rec_has_to_wait_granted(lock, fcfs_granted)) {
+                        fcfs_granted.push_back(lock);
+                    }
                 }
-            }
-            std::sort(wait_locks.begin(), wait_locks.end(), has_higher_priority);
-            for (i = 0; i < wait_locks.size(); ++i) {
-                lock = wait_locks[i];
-                if (!lock_rec_has_to_wait_granted(lock, vats_granted)) {
-                    vats_granted.push_back(lock);
+                std::sort(wait_locks.begin(), wait_locks.end(), has_higher_priority);
+                for (i = 0; i < wait_locks.size(); ++i) {
+                    lock = wait_locks[i];
+                    if (!lock_rec_has_to_wait_granted(lock, vats_granted)) {
+                        vats_granted.push_back(lock);
+                    }
                 }
+                int distance = edit_distance(fcfs_granted, vats_granted);
+                fprintf(stderr, "Edit distance: %d\n", distance);
             }
-            int distance = edit_distance(fcfs_granted, vats_granted);
-            fprintf(stderr, "Edit distance: %d\n", distance);
 //            if (wait_locks.size() > 0) {
 //                for (i = 0; i < wait_locks.size(); ++i) {
 //                    lock = wait_locks[i];
