@@ -2764,7 +2764,18 @@ lock_rec_dequeue_from_page(
                     wait_locks.push_back(lock);
                 }
             }
+            fprintf(stderr, "Before sorting: [");
+            for (i = 0; i < wait_locks.size(); ++i) {
+                lock = wait_locks[i];
+                fprintf(stderr, "%lu,", lock->trx->id);
+            }
+            fprintf(stderr, "]\nAfter sorting: [");
             std::sort(wait_locks.begin(), wait_locks.end(), has_higher_priority);
+            for (i = 0; i < wait_locks.size(); ++i) {
+                lock = wait_locks[i];
+                fprintf(stderr, "%lu,", lock->trx->id);
+            }
+            fprintf(stderr, "]\nGranted: [");
             for (i = 0; i < wait_locks.size(); ++i) {
                 lock = wait_locks[i];
                 if (!lock_rec_has_to_wait_granted(lock, granted_locks)) {
@@ -2773,8 +2784,10 @@ lock_rec_dequeue_from_page(
                                 rec_fold, lock);
                     lock_rec_move_to_front(lock, rec_fold);
                     granted_locks.push_back(lock);
+                    fprintf(stderr, "%lu,", lock->trx->id);
                 }
             }
+            fprintf(stderr, "]\n");
         }
     }
 }
