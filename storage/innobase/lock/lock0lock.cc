@@ -74,8 +74,8 @@ bitmap */
 /** Lock scheduling algorithm */
 ulong innodb_lock_schedule_algorithm = INNODB_LOCK_SCHEDULE_ALGORITHM_VATS;
 
-double total_schedule;
-double has_diff_schedule;
+double total_schedule = 0;
+double has_diff_schedule = 0;
 
 /* An explicit record lock affects both the record and the gap before it.
 An implicit x-lock does not affect the gap, it only locks the index
