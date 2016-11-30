@@ -2694,7 +2694,7 @@ set_diff(
     std::vector<lock_t *> diff(word1.size() + word2.size());
     std::sort(word1.begin(), word1.end());
     std::sort(word2.begin(), word2.end());
-    std::vector<lock_t *> it = std::set_symmetric_difference(word1.begin(),
+    std::vector<lock_t *>::iterator it = std::set_symmetric_difference(word1.begin(),
                                                              word1.end(),
                                                              word2.begin(),
                                                              word2.end(),
