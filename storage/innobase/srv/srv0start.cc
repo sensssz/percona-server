@@ -3147,6 +3147,8 @@ innobase_shutdown_for_mysql(void)
 	srv_was_started = FALSE;
 	srv_start_has_been_called = FALSE;
 
+    fprintf(stderr, "Schedule ratio: %ld\n", has_diff_schedule / total_schedule);
+
 	return(DB_SUCCESS);
 }
 #endif /* !UNIV_HOTBACKUP */

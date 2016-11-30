@@ -74,6 +74,9 @@ bitmap */
 /** Lock scheduling algorithm */
 ulong innodb_lock_schedule_algorithm = INNODB_LOCK_SCHEDULE_ALGORITHM_VATS;
 
+double total_schedule;
+double has_diff_schedule;
+
 /* An explicit record lock affects both the record and the gap before it.
 An implicit x-lock does not affect the gap, it only locks the index
 record from read or update.
@@ -2805,7 +2808,9 @@ lock_rec_dequeue_from_page(
                     }
                 }
                 int diff = set_diff(fcfs_granted, vats_granted);
-                fprintf(stderr, "Set diff: %d\n", diff);
+//                fprintf(stderr, "Set diff: %d\n", diff);
+                total_schedule++;
+                has_diff_schedule += diff > 0;
             }
 //            if (wait_locks.size() > 0) {
 //                for (i = 0; i < wait_locks.size(); ++i) {
