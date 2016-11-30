@@ -2167,21 +2167,6 @@ lock_rec_enqueue_waiting(
 
         err = (DB_LOCK_WAIT);
     }
-    // Move it only when it does not cause a deadlock.
-    if (err != DB_DEADLOCK
-        && innodb_lock_schedule_algorithm
-        == INNODB_LOCK_SCHEDULE_ALGORITHM_VATS
-        && !thd_is_replication_slave_thread(lock->trx->mysql_thd)) {
-
-        rec_fold = lock_rec_fold(lock->un_member.rec_lock.space,
-                                 lock->un_member.rec_lock.page_no);
-        HASH_DELETE(lock_t, hash, lock_sys->rec_hash,
-                    rec_fold, lock);
-        dberr_t res = lock_rec_insert_by_trx_age(lock, lock_get_wait(lock));
-        if (res != DB_SUCCESS) {
-            return res;
-        }
-    }
 
     return err;
 }
