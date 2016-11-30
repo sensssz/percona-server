@@ -52,6 +52,8 @@ Created 5/7/1996 Heikki Tuuri
 #include <set>
 #include <vector>
 
+#include <ctime>
+
 /* Restricts the length of search we will do in the waits-for
 graph of transactions */
 #define LOCK_MAX_N_STEPS_IN_DEADLOCK_CHECK 1000000
@@ -76,6 +78,7 @@ ulong innodb_lock_schedule_algorithm = INNODB_LOCK_SCHEDULE_ALGORITHM_VATS;
 
 double total_schedule = 0;
 double has_diff_schedule = 0;
+time_t last_update = 0;
 
 /* An explicit record lock affects both the record and the gap before it.
 An implicit x-lock does not affect the gap, it only locks the index
@@ -2771,6 +2774,14 @@ lock_rec_dequeue_from_page(
             }
         }
     } else {
+        time_t now;
+        time(&now);
+        if (difftime(now, last_update) > 10) {
+            total_schedule = 0;
+            has_diff_schedule = 0;
+        }
+        last_update = now;
+
         for (heap_no = 0; heap_no < lock_rec_get_n_bits(in_lock); ++heap_no) {
             if (!lock_rec_get_nth_bit(in_lock, heap_no)) {
                 continue;
@@ -4973,7 +4984,7 @@ released:
         space = lock->un_member.rec_lock.space;
         page_no = lock->un_member.rec_lock.page_no;
         rec_fold = lock_rec_fold(space, page_no);
-        for (lock = lock_rec_get_first(space, page_no, heap_no);
+        for (lock = first_lock;
              lock != NULL;
              lock = lock_rec_get_next(heap_no, lock)) {
             if (!lock_get_wait(lock)) {
