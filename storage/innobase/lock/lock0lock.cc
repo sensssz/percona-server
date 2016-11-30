@@ -2673,7 +2673,10 @@ lock_rec_has_to_wait_granted(
 	const lock_t*	wait_lock,	/*!< in: waiting record lock */
     std::vector<lock_t *>   granted_locks)  /*!< in: granted record lock */
 {
-    for (auto lock : granted_locks) {
+    int i;
+    lock_t *lock;
+    for (i = 0; i < granted_locks.size(); ++i) {
+        lock = granted_locks[i];
         if (lock_has_to_wait(wait_lock, lock)) {
             return lock;
         }
@@ -2721,6 +2724,7 @@ lock_rec_dequeue_from_page(
     ulint       rec_fold;
 	lock_t*		lock;
     trx_lock_t*	trx_lock;
+    int         i;
     std::vector<lock_t *> wait_locks;
     std::vector<lock_t *> granted_locks;
 
@@ -2776,7 +2780,8 @@ lock_rec_dequeue_from_page(
                 }
             }
             std::sort(wait_locks.begin(), wait_locks.end(), has_higher_priority);
-            for (auto lock : wait_locks) {
+            for (i = 0; i < wait_locks.size(); ++i) {
+                lock = wait_locks[i];
                 if (!lock_rec_has_to_wait_granted(lock, granted_locks)) {
                     lock_grant(lock, false);
                     HASH_DELETE(lock_t, hash, lock_sys->rec_hash,
@@ -4858,6 +4863,7 @@ lock_rec_unlock(
     ulint       rec_fold;
 	const char*	stmt;
     size_t		stmt_len;
+    int         i;
     std::vector<lock_t *> wait_locks;
     std::vector<lock_t *> granted_locks;
 
@@ -4931,7 +4937,8 @@ released:
             }
         }
         std::sort(wait_locks.begin(), wait_locks.end(), has_higher_priority);
-        for (auto lock : wait_locks) {
+        for (i = 0; i < wait_locks.size(); ++i) {
+            lock = wait_locks[i];
             if (!lock_rec_has_to_wait_granted(lock, granted_locks)) {
                 lock_grant(lock, false);
                 HASH_DELETE(lock_t, hash, lock_sys->rec_hash,
