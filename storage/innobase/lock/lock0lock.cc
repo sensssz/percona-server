@@ -48,7 +48,9 @@ Created 5/7/1996 Heikki Tuuri
 #include "ut0vec.h"
 #include "btr0btr.h"
 #include "dict0boot.h"
+#include <algorithm>
 #include <set>
+#include <vector>
 
 /* Restricts the length of search we will do in the waits-for
 graph of transactions */
@@ -2007,18 +2009,7 @@ lock_rec_create(
 
 	index->table->n_rec_locks++;
     ut_ad(index->table->n_ref_count > 0 || !index->table->can_be_evicted);
-
-    if (innodb_lock_schedule_algorithm == INNODB_LOCK_SCHEDULE_ALGORITHM_VATS
-        && !thd_is_replication_slave_thread(lock->trx->mysql_thd)) {
-        if (type_mode & LOCK_WAIT) {
-            HASH_INSERT(lock_t, hash, lock_sys->rec_hash, rec_fold, lock);
-        } else {
-            lock_rec_insert_to_head(lock, rec_fold);
-        }
-    } else {
-        HASH_INSERT(lock_t, hash, lock_sys->rec_hash, rec_fold, lock);
-    }
-
+    HASH_INSERT(lock_t, hash, lock_sys->rec_hash, rec_fold, lock);
 	lock_sys->rec_num++;
 
 	if (!caller_owns_trx_mutex) {
@@ -2653,22 +2644,57 @@ lock_rec_cancel(
 }
 
 static
+lock_t *
+lock_rec_get_first(
+    ulint   space,
+    ulint   page_no,
+    ulint   heap_no)
+{
+    lock_t *lock;
+
+    lock = lock_rec_get_first_on_page_addr(space, page_no);
+    if (lock != NULL && !lock_rec_get_nth_bit(lock, heap_no)) {
+        lock = lock_rec_get_next(heap_no, lock);
+    }
+
+    return lock;
+}
+
+/*********************************************************************//**
+Checks if a waiting record lock request still has to for granted locks.
+@return	lock that is causing the wait */
+static
+const lock_t*
+lock_rec_has_to_wait_granted(
+/*==========================*/
+	const lock_t*	wait_lock,	/*!< in: waiting record lock */
+    std::vector<lock_t *>   granted_locks)  /*!< in: granted record lock */
+{
+    for (auto lock : granted_locks) {
+        if (lock_has_to_wait(wait_lock, lock)) {
+            return lock;
+        }
+    }
+    return NULL;
+}
+
+static
 void
 lock_rec_move_to_front(
-  lock_t *lock_to_move,
-  ulint rec_fold)
+    lock_t *lock_to_move,
+    ulint   rec_fold)
 {
-  if (lock_to_move != NULL)
-  {
-    // Move the target lock to the head of the list
-    hash_cell_t* cell = hash_get_nth_cell(lock_sys->rec_hash,
+    if (lock_to_move != NULL)
+    {
+        // Move the target lock to the head of the list
+        hash_cell_t* cell = hash_get_nth_cell(lock_sys->rec_hash,
                                           hash_calc_hash(rec_fold, lock_sys->rec_hash));
-    if (lock_to_move != cell->node) {
-      lock_t *next = (lock_t *) cell->node;
-      cell->node = lock_to_move;
-      lock_to_move->hash = next;
+        if (lock_to_move != cell->node) {
+            lock_t *next = (lock_t *) cell->node;
+            cell->node = lock_to_move;
+            lock_to_move->hash = next;
+        }
     }
-  }
 }
 
 /*************************************************************//**
@@ -2688,10 +2714,13 @@ lock_rec_dequeue_from_page(
 {
 	ulint		space;
 	ulint		page_no;
+    ulint       heap_no;
     ulint       rec_fold;
-    lock_t*     previous;
 	lock_t*		lock;
-	trx_lock_t*	trx_lock;
+    trx_lock_t*	trx_lock;
+    std::vector<lock_t *> wait_locks;
+    std::vector<lock_t *> granted_locks;
+
 
 	ut_ad(lock_mutex_own());
 	ut_ad(lock_get_type_low(in_lock) == LOCK_REC);
@@ -2728,30 +2757,30 @@ lock_rec_dequeue_from_page(
             }
         }
     } else {
-        previous = NULL;
-        for (lock = lock_rec_get_first_on_page_addr(space, page_no);
-             lock != NULL;) {
-            // If the lock is a wait lock on this page, and it does not need to wait
-            if ((lock->un_member.rec_lock.space == space)
-                && (lock->un_member.rec_lock.page_no == page_no)
-                && lock_get_wait(lock)
-                && !lock_rec_has_to_wait_in_queue(lock)) {
-
-                lock_grant(lock, false);
-
-                if (previous != NULL) {
-                    // Move the lock to the head of the list
-                    HASH_GET_NEXT(hash, previous) = HASH_GET_NEXT(hash, lock);
-                    lock_rec_move_to_front(lock, rec_fold);
+        for (heap_no = 0; heap_no < lock_rec_get_n_bits(in_lock); ++heap_no) {
+            if (!lock_rec_get_nth_bit(in_lock, heap_no)) {
+                continue;
+            }
+            wait_locks.clear();
+            granted_locks.clear();
+            for (lock = lock_rec_get_first(space, page_no, heap_no);
+                 lock != NULL;
+                 lock = lock_rec_get_next(heap_no, lock)) {
+                if (!lock_get_wait(lock)) {
+                    granted_locks.push_back(lock);
                 } else {
-                    // Already at the head of the list.
-                    previous = lock;
+                    wait_locks.push_back(lock);
                 }
-                // Move on to the next lock
-                lock = static_cast<lock_t *>(HASH_GET_NEXT(hash, previous));
-            } else {
-                previous = lock;
-                lock = static_cast<lock_t *>(HASH_GET_NEXT(hash, lock));
+            }
+            std::sort(wait_locks.begin, wait_locks.end(), has_higher_priority);
+            for (auto lock : wait_locks) {
+                if (!lock_rec_has_to_wait_granted(lock, granted_locks)) {
+                    lock_grant(lock, false);
+                    HASH_DELETE(lock_t, hash, lock_sys->rec_hash,
+                                rec_fold, lock);
+                    lock_rec_move_to_front(lock, rec_fold);
+                    granted_locks.push_back(lock);
+                }
             }
         }
     }
@@ -4819,14 +4848,15 @@ lock_rec_unlock(
 	enum lock_mode		lock_mode)/*!< in: LOCK_S or LOCK_X */
 {
 	lock_t*		first_lock;
-    lock_t*     previous;
     lock_t*		lock;
     ulint       space;
     ulint       page_no;
     ulint		heap_no;
     ulint       rec_fold;
 	const char*	stmt;
-	size_t		stmt_len;
+    size_t		stmt_len;
+    std::vector<lock_t *> wait_locks;
+    std::vector<lock_t *> granted_locks;
 
 	ut_ad(trx);
 	ut_ad(rec);
@@ -4888,31 +4918,23 @@ released:
         space = lock->un_member.rec_lock.space;
         page_no = lock->un_member.rec_lock.page_no;
         rec_fold = lock_rec_fold(space, page_no);
-        previous = NULL;
-        for (lock = first_lock;
-             lock != NULL;) {
-            // If the lock is a wait lock on this page, and it does not need to wait
-            if ((lock->un_member.rec_lock.space == space)
-                && (lock->un_member.rec_lock.page_no == page_no)
-                && lock_rec_get_nth_bit(lock, heap_no)
-                && lock_get_wait(lock)
-                && !lock_rec_has_to_wait_in_queue(lock)) {
-
-                lock_grant(lock, false);
-
-                if (previous != NULL) {
-                    // Move the lock to the head of the list
-                    HASH_GET_NEXT(hash, previous) = HASH_GET_NEXT(hash, lock);
-                    lock_rec_move_to_front(lock, rec_fold);
-                } else {
-                    // Already at the head of the list.
-                    previous = lock;
-                }
-                // Move on to the next lock
-                lock = static_cast<lock_t *>(HASH_GET_NEXT(hash, previous));
+        for (lock = lock_rec_get_first(space, page_no, heap_no);
+             lock != NULL;
+             lock = lock_rec_get_next(heap_no, lock)) {
+            if (!lock_get_wait(lock)) {
+                granted_locks.push_back(lock);
             } else {
-                previous = lock;
-                lock = static_cast<lock_t *>(HASH_GET_NEXT(hash, lock));
+                wait_locks.push_back(lock);
+            }
+        }
+        std::sort(wait_locks.begin, wait_locks.end(), has_higher_priority);
+        for (auto lock : wait_locks) {
+            if (!lock_rec_has_to_wait_granted(lock, granted_locks)) {
+                lock_grant(lock, false);
+                HASH_DELETE(lock_t, hash, lock_sys->rec_hash,
+                            rec_fold, lock);
+                lock_rec_move_to_front(lock, rec_fold);
+                granted_locks.push_back(lock);
             }
         }
     }
