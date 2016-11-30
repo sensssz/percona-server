@@ -2697,7 +2697,7 @@ edit_distance(
     int i, j, l1, l2, m;
     l1 = word1.size();
     l2 = word2.size();
-    std::vector<std::vector<int>> t(l1 + 1, std::vector<int>(l2 + 1));
+    std::vector<std::vector<int> > t(l1 + 1, std::vector<int>(l2 + 1));
  
     for (i = 0; i <= l1; i++)
         t[i][0] = i;
