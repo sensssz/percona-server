@@ -2817,7 +2817,7 @@ lock_rec_dequeue_from_page(
                 }
             }
             int distance = edit_distance(fcfs_granted, vats_granted);
-            fprintf(stderr, "Edit distance: %d", distance);
+            fprintf(stderr, "Edit distance: %d\n", distance);
 //            if (wait_locks.size() > 0) {
 //                for (i = 0; i < wait_locks.size(); ++i) {
 //                    lock = wait_locks[i];
