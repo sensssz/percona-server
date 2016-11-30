@@ -55,6 +55,8 @@ enum innodb_lock_schedule_algorithm_t {
 extern ulong innodb_lock_schedule_algorithm;
 extern double total_schedule;
 extern double has_diff_schedule;
+extern double schedule_total;
+extern double schedule_diff;
 
 /*********************************************************************//**
 Gets the size of a lock struct.
