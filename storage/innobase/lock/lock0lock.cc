@@ -2688,6 +2688,33 @@ lock_rec_move_to_front(
     }
 }
 
+static
+int
+edit_distance(
+    std::vector<lock_t *> &word1,
+    std::vector<lock_t *> &word2)
+{
+    int i, j, l1, l2, m;
+    l1 = word1.size();
+    l2 = word2.size();
+    std::vector<std::vector<int>> t(l1 + 1, std::vector<int>(l2 + 1));
+ 
+    for (i = 0; i <= l1; i++)
+        t[i][0] = i;
+    for (i = 1; i <= l2; i++)
+        t[0][i] = i;
+ 
+    for (i = 1; i <= l1; i++)
+    {
+        for (j = 1; j <= l2; j++)
+        {
+            m = std::min(t[i-1][j], t[i][j-1]) + 1;
+            t[i][j] = std::min(m, t[i-1][j-1] + (word1[i-1] == word2[j-1] ? 0 : 1));
+        }
+    }
+    return t[l1][l2];
+}
+
 /*************************************************************//**
 Removes a record lock request, waiting or granted, from the queue and
 grants locks to other transactions in the queue if they now are entitled
@@ -2712,6 +2739,8 @@ lock_rec_dequeue_from_page(
     ulint       i;
     std::vector<lock_t *> wait_locks;
     std::vector<lock_t *> granted_locks;
+    std::vector<lock_t *> fcfs_granted;
+    std::vector<lock_t *> vats_granted;
 
 
 	ut_ad(lock_mutex_own());
@@ -2764,22 +2793,38 @@ lock_rec_dequeue_from_page(
                     wait_locks.push_back(lock);
                 }
             }
-            if (wait_locks.size() > 0) {
-                fprintf(stderr, "Before sorting: [");
-                for (i = 0; i < wait_locks.size(); ++i) {
-                    lock = wait_locks[i];
-                    fprintf(stderr, "%lu,", lock->trx->id);
+//            if (wait_locks.size() > 0) {
+//                fprintf(stderr, "Before sorting: [");
+//                for (i = 0; i < wait_locks.size(); ++i) {
+//                    lock = wait_locks[i];
+//                    fprintf(stderr, "%lu,", lock->trx->id);
+//                }
+//                fprintf(stderr, "]\nAfter sorting: [");
+//            }
+            fcfs_granted = granted_locks;
+            vats_granted = granted_locks;
+            for (i = 0; i < wait_locks.size(); ++i) {
+                lock = wait_locks[i];
+                if (!lock_rec_has_to_wait_granted(lock, fcfs_granted)) {
+                    fcfs_granted.push_back(lock);
                 }
-                fprintf(stderr, "]\nAfter sorting: [");
             }
             std::sort(wait_locks.begin(), wait_locks.end(), has_higher_priority);
-            if (wait_locks.size() > 0) {
-                for (i = 0; i < wait_locks.size(); ++i) {
-                    lock = wait_locks[i];
-                    fprintf(stderr, "%lu,", lock->trx->id);
+            for (i = 0; i < wait_locks.size(); ++i) {
+                lock = wait_locks[i];
+                if (!lock_rec_has_to_wait_granted(lock, vats_granted)) {
+                    vats_granted.push_back(lock);
                 }
-                fprintf(stderr, "]\nGranted: [");
             }
+            int distance = edit_distance(fcfs_granted, vats_granted);
+            fprintf(stderr, "Edit distance: %d", distance);
+//            if (wait_locks.size() > 0) {
+//                for (i = 0; i < wait_locks.size(); ++i) {
+//                    lock = wait_locks[i];
+//                    fprintf(stderr, "%lu,", lock->trx->id);
+//                }
+//                fprintf(stderr, "]\nGranted: [");
+//            }
             for (i = 0; i < wait_locks.size(); ++i) {
                 lock = wait_locks[i];
                 if (!lock_rec_has_to_wait_granted(lock, granted_locks)) {
@@ -2788,12 +2833,12 @@ lock_rec_dequeue_from_page(
                                 rec_fold, lock);
                     lock_rec_move_to_front(lock, rec_fold);
                     granted_locks.push_back(lock);
-                    fprintf(stderr, "%lu,", lock->trx->id);
+//                    fprintf(stderr, "%lu,", lock->trx->id);
                 }
             }
-            if (wait_locks.size() > 0) {
-                fprintf(stderr, "]\n");
-            }
+//            if (wait_locks.size() > 0) {
+//                fprintf(stderr, "]\n");
+//            }
         }
     }
 }
