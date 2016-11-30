@@ -2668,7 +2668,7 @@ const lock_t*
 lock_rec_has_to_wait_granted(
 /*==========================*/
 	const lock_t*	wait_lock,	/*!< in: waiting record lock */
-    std::vector<lock_t *>   granted_locks)  /*!< in: granted record lock */
+    std::vector<lock_t *>   &granted_locks)  /*!< in: granted record lock */
 {
     ulint   i;
     lock_t *lock;
