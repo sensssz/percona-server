@@ -2721,7 +2721,7 @@ lock_rec_dequeue_from_page(
     ulint       rec_fold;
 	lock_t*		lock;
     trx_lock_t*	trx_lock;
-    int         i;
+    ulint       i;
     std::vector<lock_t *> wait_locks;
     std::vector<lock_t *> granted_locks;
 
@@ -4860,7 +4860,7 @@ lock_rec_unlock(
     ulint       rec_fold;
 	const char*	stmt;
     size_t		stmt_len;
-    int         i;
+    ulint       i;
     std::vector<lock_t *> wait_locks;
     std::vector<lock_t *> granted_locks;
 
