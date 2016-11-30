@@ -2695,6 +2695,8 @@ set_diff(
     std::vector<lock_t *> &word2)
 {
     std::vector<lock_t *> diff;
+    std::sort(word1.begin(), word1.end());
+    std::sort(word2.begin(), word2.end());
     std::set_symmetric_difference(word1.begin(), word1.end(), word2.begin(), word2.end(), diff.begin());
     return diff.size();
 }
