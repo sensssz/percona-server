@@ -2670,7 +2670,7 @@ lock_rec_has_to_wait_granted(
 	const lock_t*	wait_lock,	/*!< in: waiting record lock */
     std::vector<lock_t *>   granted_locks)  /*!< in: granted record lock */
 {
-    int i;
+    ulint   i;
     lock_t *lock;
     for (i = 0; i < granted_locks.size(); ++i) {
         lock = granted_locks[i];
