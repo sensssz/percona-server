@@ -2686,30 +2686,14 @@ lock_rec_move_to_front(
 }
 
 static
-int
-edit_distance(
+ulint
+set_diff(
     std::vector<lock_t *> &word1,
     std::vector<lock_t *> &word2)
 {
-    int i, j, l1, l2, m;
-    l1 = word1.size();
-    l2 = word2.size();
-    std::vector<std::vector<int> > t(l1 + 1, std::vector<int>(l2 + 1));
- 
-    for (i = 0; i <= l1; i++)
-        t[i][0] = i;
-    for (i = 1; i <= l2; i++)
-        t[0][i] = i;
- 
-    for (i = 1; i <= l1; i++)
-    {
-        for (j = 1; j <= l2; j++)
-        {
-            m = std::min(t[i-1][j], t[i][j-1]) + 1;
-            t[i][j] = std::min(m, t[i-1][j-1] + (word1[i-1] == word2[j-1] ? 0 : 1));
-        }
-    }
-    return t[l1][l2];
+    std::vector<lock_t *> diff;
+    std::set_symmetric_difference(word1.begin(), word1.end(), word2.begin(), word2.end(), diff.begin());
+    return diff.size();
 }
 
 /*************************************************************//**
@@ -2814,8 +2798,8 @@ lock_rec_dequeue_from_page(
                         vats_granted.push_back(lock);
                     }
                 }
-                int distance = edit_distance(fcfs_granted, vats_granted);
-                fprintf(stderr, "Edit distance: %d\n", distance);
+                int diff = set_diff(fcfs_granted, vats_granted);
+                fprintf(stderr, "Set diff: %d\n", diff);
             }
 //            if (wait_locks.size() > 0) {
 //                for (i = 0; i < wait_locks.size(); ++i) {
