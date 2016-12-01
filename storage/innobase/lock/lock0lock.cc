@@ -2295,7 +2295,7 @@ lock_rec_enqueue_waiting(
         err = (DB_LOCK_WAIT);
     }
 
-    update_dep_size(lock, heap_no, err == DB_LOCK_WAIT);
+    update_dep_size(lock, heap_no, err == DB_LOCK_WAIT || err == DB_DEADLOCK);
 
     return err;
 }
