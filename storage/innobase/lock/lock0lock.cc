@@ -2008,15 +2008,11 @@ lock_rec_create(
 	index->table->n_rec_locks++;
     ut_ad(index->table->n_ref_count > 0 || !index->table->can_be_evicted);
 
-    if (innodb_lock_schedule_algorithm == INNODB_LOCK_SCHEDULE_ALGORITHM_VATS
-        && !thd_is_replication_slave_thread(lock->trx->mysql_thd)) {
-        if (type_mode & LOCK_WAIT) {
-            HASH_INSERT(lock_t, hash, lock_sys->rec_hash, rec_fold, lock);
-        } else {
-            lock_rec_insert_to_head(lock, rec_fold);
-        }
+    if (innodb_lock_schedule_algorithm == INNODB_LOCK_SCHEDULE_ALGORITHM_FCFS) {
+        HASH_INSERT(lock_t, hash, lock_sys->rec_hash,
+                    lock_rec_fold(space, page_no), lock);
     } else {
-        HASH_INSERT(lock_t, hash, lock_sys->rec_hash, rec_fold, lock);
+        lock_rec_insert_by_trx_age(lock, type_mode & LOCK_WAIT);
     }
 
 	lock_sys->rec_num++;
@@ -2173,21 +2169,21 @@ lock_rec_enqueue_waiting(
 
         err = (DB_LOCK_WAIT);
     }
-    // Move it only when it does not cause a deadlock.
-    if (err != DB_DEADLOCK
-        && innodb_lock_schedule_algorithm
-        == INNODB_LOCK_SCHEDULE_ALGORITHM_VATS
-        && !thd_is_replication_slave_thread(lock->trx->mysql_thd)) {
-
-        rec_fold = lock_rec_fold(lock->un_member.rec_lock.space,
-                                 lock->un_member.rec_lock.page_no);
-        HASH_DELETE(lock_t, hash, lock_sys->rec_hash,
-                    rec_fold, lock);
-        dberr_t res = lock_rec_insert_by_trx_age(lock, lock_get_wait(lock));
-        if (res != DB_SUCCESS) {
-            return res;
-        }
-    }
+//    // Move it only when it does not cause a deadlock.
+//    if (err != DB_DEADLOCK
+//        && innodb_lock_schedule_algorithm
+//        == INNODB_LOCK_SCHEDULE_ALGORITHM_VATS
+//        && !thd_is_replication_slave_thread(lock->trx->mysql_thd)) {
+//
+//        rec_fold = lock_rec_fold(lock->un_member.rec_lock.space,
+//                                 lock->un_member.rec_lock.page_no);
+//        HASH_DELETE(lock_t, hash, lock_sys->rec_hash,
+//                    rec_fold, lock);
+//        dberr_t res = lock_rec_insert_by_trx_age(lock, lock_get_wait(lock));
+//        if (res != DB_SUCCESS) {
+//            return res;
+//        }
+//    }
 
     return err;
 }
