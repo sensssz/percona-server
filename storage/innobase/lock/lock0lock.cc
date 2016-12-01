@@ -2017,7 +2017,12 @@ lock_rec_create(
 
 	index->table->n_rec_locks++;
     ut_ad(index->table->n_ref_count > 0 || !index->table->can_be_evicted);
-    HASH_INSERT(lock_t, hash, lock_sys->rec_hash, rec_fold, lock);
+    if (innodb_lock_schedule_algorithm == INNODB_LOCK_SCHEDULE_ALGORITHM_VATS &&
+        !(type_mode & LOCK_WAIT)) {
+        lock_rec_insert_to_head(lock, rec_fold);
+    } else {
+        HASH_INSERT(lock_t, hash, lock_sys->rec_hash, rec_fold, lock);
+    }
 	lock_sys->rec_num++;
 
 	if (!caller_owns_trx_mutex) {
@@ -2813,7 +2818,7 @@ lock_rec_dequeue_from_page(
 //                        fcfs_granted.push_back(lock);
 //                    }
 //                }
-//                std::sort(wait_locks.begin(), wait_locks.end(), has_higher_priority);
+            std::sort(wait_locks.begin(), wait_locks.end(), has_higher_priority);
 //                for (i = 0; i < wait_locks.size(); ++i) {
 //                    lock = wait_locks[i];
 //                    if (!lock_rec_has_to_wait_granted(lock, vats_granted)) {
