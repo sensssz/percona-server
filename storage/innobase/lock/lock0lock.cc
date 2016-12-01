@@ -2015,13 +2015,14 @@ update_dep_size(
     page_no = in_lock->un_member.rec_lock.page_no;
 
     if (wait) {
-        in_lock->trx->size_updated = true;
         for (lock = lock_rec_get_first(space, page_no, heap_no);
              lock != NULL;
              lock = lock_rec_get_next(heap_no, lock)) {
             if (!lock_get_wait(lock)
                 && in_lock->trx != lock->trx) {
+                in_lock->trx->size_updated = true;
                 update_dep_size(lock->trx, in_lock->trx->dep_size + 1);
+                in_lock->trx->size_updated = true;
                 ut_a(lock->trx->dep_size > in_lock->trx->dep_size);
             }
         }
