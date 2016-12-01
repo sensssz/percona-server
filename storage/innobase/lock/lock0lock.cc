@@ -2905,7 +2905,7 @@ lock_rec_dequeue_from_page(
                 }
             }
             if (lock_get_wait(in_lock)) {
-                sub_total_size_delta -= in_lock->trx->dep_size + 1;
+                sub_dep_size_total -= in_lock->trx->dep_size + 1;
             }
             for (i = 0; i < granted_locks.size(); ++i) {
                 lock = granted_locks[i];
