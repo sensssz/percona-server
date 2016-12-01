@@ -1954,7 +1954,12 @@ void
 reset_trx_size_updated()
 {
     trx_t *trx;
-    for (trx = UT_LIST_GET_FIRST(trx_sys->mysql_trx_list);
+    for (trx = UT_LIST_GET_FIRST(trx_sys->rw_trx_list);
+         trx != NULL;
+         trx = UT_LIST_GET_NEXT(trx_list, trx)) {
+        trx->size_updated = false;
+    }
+    for (trx = UT_LIST_GET_FIRST(trx_sys->ro_trx_list);
          trx != NULL;
          trx = UT_LIST_GET_NEXT(trx_list, trx)) {
         trx->size_updated = false;
