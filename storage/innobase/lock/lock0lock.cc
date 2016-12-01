@@ -1963,7 +1963,8 @@ void
 update_dep_size(
     trx_t  *trx,
     long    size_delta,
-    long    depth = 1)
+    bool    enqueuing=false,
+    long    depth=1)
 {
     ulint   space;
     ulint   page_no;
@@ -1979,7 +1980,8 @@ update_dep_size(
     trx->dep_size += size_delta;
     ut_a(trx->dep_size >= 0);
     if (trx->state != TRX_STATE_ACTIVE
-        || trx->lock.wait_lock == NULL) {
+        || trx->lock.wait_lock == NULL
+        || enqueuing) {
         if (depth == 1) {
             reset_trx_size_updated();
         }
@@ -2025,13 +2027,10 @@ update_dep_size(
             if (!lock_get_wait(lock)
                 && in_lock->trx != lock->trx) {
                 ib_logf(IB_LOG_LEVEL_INFO, "Update trx %lu using %lu", lock->trx->id, in_lock->trx->id);
-                in_lock->trx->size_updated = true;
-                update_dep_size(lock->trx, in_lock->trx->dep_size + 1);
-                in_lock->trx->size_updated = true;
+                update_dep_size(lock->trx, in_lock->trx->dep_size + 1, true);
                 ut_a(lock->trx->dep_size > in_lock->trx->dep_size);
             }
         }
-        in_lock->trx->size_updated = false;
     } else {
         total_size_delta = 0;
         for (lock = lock_rec_get_first(space, page_no, heap_no);
