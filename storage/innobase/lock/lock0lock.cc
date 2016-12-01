@@ -1978,6 +1978,7 @@ update_dep_size(
     }
 
     trx->size_updated = true;
+    ib_logf(IB_LOG_LEVEL_INFO, "trx %lu updated from %ld->%ld", trx->id, trx->dep_size, trx->dep_size + size_delta);
     trx->dep_size += size_delta;
     ut_a(trx->dep_size >= 0);
     if (trx->state != TRX_STATE_ACTIVE
@@ -2023,6 +2024,7 @@ update_dep_size(
              lock = lock_rec_get_next(heap_no, lock)) {
             if (!lock_get_wait(lock)
                 && in_lock->trx != lock->trx) {
+                ib_logf(IB_LOG_LEVEL_INFO, "Update trx %lu using %lu", lock->trx->id, in_lock->trx->id);
                 in_lock->trx->size_updated = true;
                 update_dep_size(lock->trx, in_lock->trx->dep_size + 1);
                 in_lock->trx->size_updated = true;
