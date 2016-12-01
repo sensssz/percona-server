@@ -1855,25 +1855,17 @@ has_higher_priority(
   lock_t *lock1,
   lock_t *lock2)
 {
-  if (lock1 == NULL) {
-    return false;
-  } else if (lock2 == NULL) {
-    return true;
-  }
-  if (!lock_get_wait(lock1)) {
-    return true;
-  } else if (!lock_get_wait(lock2)) {
-    return false;
-  }
-  trx_t *trx1 = lock1->trx;
-  trx_t *trx2 = lock2->trx;
-  if (trx1->start_time_nano.tv_sec < trx2->start_time_nano.tv_sec) {
-    return true;
-  } else if (trx1->start_time_nano.tv_sec > trx2->start_time_nano.tv_sec) {
-    return false;
-  } else {
-    return trx1->start_time_nano.tv_nsec <= trx2->start_time_nano.tv_nsec;
-  }
+    if (lock1 == NULL) {
+        return false;
+    } else if (lock2 == NULL) {
+        return true;
+    }
+    if (!lock_get_wait(lock1)) {
+        return true;
+    } else if (!lock_get_wait(lock2)) {
+        return false;
+    }
+    return lock1->trx->dep_size >= lock2->trx->dep_size;
 }
 
 static
@@ -1934,6 +1926,112 @@ lock_rec_insert_to_head(
     if (node != in_lock) {
         cell->node = in_lock;
         in_lock->hash = node;
+    }
+}
+
+static
+lock_t *
+lock_rec_get_first(
+    ulint   space,
+    ulint   page_no,
+    ulint   heap_no)
+{
+    lock_t *lock;
+
+    lock = lock_rec_get_first_on_page_addr(space, page_no);
+    if (lock != NULL && !lock_rec_get_nth_bit(lock, heap_no)) {
+        lock = lock_rec_get_next(heap_no, lock);
+    }
+
+    return lock;
+}
+
+static
+void
+reset_trx_size_updated()
+{
+    trx_t *trx;
+    for (trx = UT_LIST_GET_FIRST(trx_sys->rw_trx_list);
+         trx != NULL;
+         trx = UT_LIST_GET_NEXT(trx_list, trx)) {
+        trx->size_updated = false;
+    }
+}
+
+static
+void
+update_dep_size(
+    trx_t  *trx,
+    long    size_delta,
+    long    depth = 1)
+{
+    ulint   space;
+    ulint   page_no;
+    ulint   heap_no;
+    lock_t *lock;
+
+    if (trx->size_updated) {
+        return;
+    }
+
+    trx->size_updated = true;
+    trx->dep_size += size_delta;
+    if (trx->state != TRX_STATE_ACTIVE
+        || trx->lock.wait_lock == NULL) {
+        return;
+    }
+
+    space = trx->lock.wait_lock->un_member.rec_lock.space;
+    page_no = trx->lock.wait_lock->un_member.rec_lock.page_no;
+    heap_no = lock_rec_find_set_bit(trx->lock.wait_lock);
+    for (lock = lock_rec_get_first(space, page_no, heap_no);
+         lock != NULL;
+         lock = lock_rec_get_next(heap_no, lock)) {
+        if (!lock_get_wait(lock)
+            && trx != lock->trx) {
+            update_dep_size(trx, size_delta, depth + 1);
+        }
+    }
+    if (depth == 1) {
+        reset_trx_size_updated();
+    }
+}
+
+static
+void
+update_dep_size(
+    lock_t *in_lock,
+    ulint   heap_no,
+    bool    wait)
+{
+    lock_t *lock;
+    ulint   space;
+    ulint   page_no;
+    long    total_size_delta;
+
+    space = in_lock->un_member.rec_lock.space;
+    page_no = in_lock->un_member.rec_lock.page_no;
+
+    if (wait) {
+        for (lock = lock_rec_get_first(space, page_no, heap_no);
+             lock != NULL;
+             lock = lock_rec_get_next(heap_no, lock)) {
+            if (!lock_get_wait(lock)
+                && in_lock->trx != lock->trx) {
+                update_dep_size(lock->trx, in_lock->trx->dep_size + 1);
+            }
+        }
+    } else {
+        total_size_delta = 0;
+        for (lock = lock_rec_get_first(space, page_no, heap_no);
+             lock != NULL;
+             lock = lock_rec_get_next(heap_no, lock)) {
+            if (lock_get_wait(lock)
+                && in_lock->trx != lock->trx) {
+                total_size_delta += lock->trx->dep_size + 1;
+            }
+        }
+        update_dep_size(lock->trx, total_size_delta);
     }
 }
 
@@ -2023,14 +2121,15 @@ lock_rec_create(
 	if (!caller_owns_trx_mutex) {
 		trx_mutex_enter(trx);
 	}
-	ut_ad(trx_mutex_own(trx));
+    ut_ad(trx_mutex_own(trx));
+
+    UT_LIST_ADD_LAST(trx_locks, trx->lock.trx_locks, lock);
 
 	if (type_mode & LOCK_WAIT) {
-
 		lock_set_lock_and_trx_wait(lock, trx);
-	}
-
-	UT_LIST_ADD_LAST(trx_locks, trx->lock.trx_locks, lock);
+    } else {
+        update_dep_size(lock, heap_no, false);
+    }
 
 	if (!caller_owns_trx_mutex) {
 		trx_mutex_exit(trx);
@@ -2173,6 +2272,10 @@ lock_rec_enqueue_waiting(
         err = (DB_LOCK_WAIT);
     }
 
+    if (err != DB_DEADLOCK) {
+        update_dep_size(lock, heap_no, err == DB_LOCK_WAIT);
+    }
+
     return err;
 }
 
@@ -2267,7 +2370,8 @@ lock_rec_add_to_queue(
 
 		if (lock) {
 
-			lock_rec_set_nth_bit(lock, heap_no);
+            lock_rec_set_nth_bit(lock, heap_no);
+            update_dep_size(lock, heap_no, false);
 
 			return(lock);
 		}
@@ -2360,6 +2464,7 @@ lock_rec_lock_fast(
 			if (!lock_rec_get_nth_bit(lock, heap_no)) {
 				lock_rec_set_nth_bit(lock, heap_no);
 				status = LOCK_REC_SUCCESS_CREATED;
+                update_dep_size(lock, heap_no, false);
 			}
 		}
 
@@ -2549,35 +2654,35 @@ static
 void
 lock_grant(
 /*=======*/
-	lock_t*	lock,	/*!< in/out: waiting lock request */
+	lock_t*	in_lock,	/*!< in/out: waiting lock request */
     bool    owns_trx_mutex)
 {
 	ut_ad(lock_mutex_own());
 
-	lock_reset_lock_and_trx_wait(lock);
+	lock_reset_lock_and_trx_wait(in_lock);
 
     if (!owns_trx_mutex) {
-        trx_mutex_enter(lock->trx);
+        trx_mutex_enter(in_lock->trx);
     }
 
-	if (lock_get_mode(lock) == LOCK_AUTO_INC) {
-		dict_table_t*	table = lock->un_member.tab_lock.table;
+	if (lock_get_mode(in_lock) == LOCK_AUTO_INC) {
+		dict_table_t*	table = in_lock->un_member.tab_lock.table;
 
-		if (UNIV_UNLIKELY(table->autoinc_trx == lock->trx)) {
+		if (UNIV_UNLIKELY(table->autoinc_trx == in_lock->trx)) {
 			fprintf(stderr,
 				"InnoDB: Error: trx already had"
 				" an AUTO-INC lock!\n");
 		} else {
-			table->autoinc_trx = lock->trx;
+			table->autoinc_trx = in_lock->trx;
 
-			ib_vector_push(lock->trx->autoinc_locks, &lock);
+			ib_vector_push(in_lock->trx->autoinc_locks, &in_lock);
 		}
 	}
 
 #ifdef UNIV_DEBUG
 	if (lock_print_waits) {
 		fprintf(stderr, "Lock wait for trx " TRX_ID_FMT " ends\n",
-			lock->trx->id);
+			in_lock->trx->id);
 	}
 #endif /* UNIV_DEBUG */
 
@@ -2586,10 +2691,10 @@ lock_grant(
 	TRX_QUE_LOCK_WAIT state, and there is no need to end the lock wait
 	for it */
 
-	if (lock->trx->lock.que_state == TRX_QUE_LOCK_WAIT) {
+	if (in_lock->trx->lock.que_state == TRX_QUE_LOCK_WAIT) {
 		que_thr_t*	thr;
 
-		thr = que_thr_end_lock_wait(lock->trx);
+		thr = que_thr_end_lock_wait(in_lock->trx);
 
 		if (thr != NULL) {
 			lock_wait_release_thread_if_suspended(thr);
@@ -2597,7 +2702,7 @@ lock_grant(
 	}
 
     if (!owns_trx_mutex) {
-        trx_mutex_exit(lock->trx);
+        trx_mutex_exit(in_lock->trx);
     }
 }
 
@@ -2634,23 +2739,6 @@ lock_rec_cancel(
 	}
 
 	trx_mutex_exit(lock->trx);
-}
-
-static
-lock_t *
-lock_rec_get_first(
-    ulint   space,
-    ulint   page_no,
-    ulint   heap_no)
-{
-    lock_t *lock;
-
-    lock = lock_rec_get_first_on_page_addr(space, page_no);
-    if (lock != NULL && !lock_rec_get_nth_bit(lock, heap_no)) {
-        lock = lock_rec_get_next(heap_no, lock);
-    }
-
-    return lock;
 }
 
 /*********************************************************************//**
@@ -2732,10 +2820,11 @@ lock_rec_dequeue_from_page(
 	lock_t*		lock;
     trx_lock_t*	trx_lock;
     ulint       i;
+    long        sub_dep_size_total;
+    long        add_dep_size_total;
     std::vector<lock_t *> wait_locks;
     std::vector<lock_t *> granted_locks;
-    std::vector<lock_t *> fcfs_granted;
-    std::vector<lock_t *> vats_granted;
+    std::vector<lock_t *> new_granted;
 
 
 	ut_ad(lock_mutex_own());
@@ -2785,8 +2874,11 @@ lock_rec_dequeue_from_page(
             if (!lock_rec_get_nth_bit(in_lock, heap_no)) {
                 continue;
             }
+            sub_dep_size_total = 0;
+            add_dep_size_total = 0;
             wait_locks.clear();
             granted_locks.clear();
+            new_granted.clear();
             for (lock = lock_rec_get_first(space, page_no, heap_no);
                  lock != NULL;
                  lock = lock_rec_get_next(heap_no, lock)) {
@@ -2796,16 +2888,32 @@ lock_rec_dequeue_from_page(
                     wait_locks.push_back(lock);
                 }
             }
+
             std::sort(wait_locks.begin(), wait_locks.end(), has_higher_priority);
             for (i = 0; i < wait_locks.size(); ++i) {
                 lock = wait_locks[i];
-                if (!lock_rec_has_to_wait_granted(lock, granted_locks)) {
+                if (!lock_rec_has_to_wait_granted(lock, granted_locks)
+                    && !lock_rec_has_to_wait_granted(lock, new_granted)) {
                     lock_grant(lock, false);
                     HASH_DELETE(lock_t, hash, lock_sys->rec_hash,
                                 rec_fold, lock);
                     lock_rec_move_to_front(lock, rec_fold);
-                    granted_locks.push_back(lock);
+                    new_granted.push_back(lock);
+                    sub_dep_size_total -= lock->trx->dep_size + 1;
+                } else {
+                    add_dep_size_total += lock->trx->dep_size + 1;
                 }
+            }
+            if (lock_get_wait(in_lock)) {
+                sub_total_size_delta -= in_lock->trx->dep_size + 1;
+            }
+            for (i = 0; i < granted_locks.size(); ++i) {
+                lock = granted_locks[i];
+                update_dep_size(lock->trx, sub_dep_size_total);
+            }
+            for (i = 0; i < new_granted.size(); ++i) {
+                lock = new_granted[i];
+                update_dep_size(lock->trx, add_dep_size_total);
             }
         }
     }
@@ -4881,8 +4989,11 @@ lock_rec_unlock(
 	const char*	stmt;
     size_t		stmt_len;
     ulint       i;
+    long        sub_dep_size_total;
+    long        add_dep_size_total;
     std::vector<lock_t *> wait_locks;
     std::vector<lock_t *> granted_locks;
+    std::vector<lock_t *> new_granted;
 
 	ut_ad(trx);
 	ut_ad(rec);
@@ -4944,6 +5055,8 @@ released:
         space = lock->un_member.rec_lock.space;
         page_no = lock->un_member.rec_lock.page_no;
         rec_fold = lock_rec_fold(space, page_no);
+        sub_dep_size_total = 0;
+        add_dep_size_total = 0;
         for (lock = first_lock;
              lock != NULL;
              lock = lock_rec_get_next(heap_no, lock)) {
@@ -4956,14 +5069,27 @@ released:
         std::sort(wait_locks.begin(), wait_locks.end(), has_higher_priority);
         for (i = 0; i < wait_locks.size(); ++i) {
             lock = wait_locks[i];
-            if (!lock_rec_has_to_wait_granted(lock, granted_locks)) {
+            if (!lock_rec_has_to_wait_granted(lock, granted_locks)
+                && !lock_rec_has_to_wait_granted(lock, new_granted)) {
                 lock_grant(lock, false);
                 HASH_DELETE(lock_t, hash, lock_sys->rec_hash,
                             rec_fold, lock);
                 lock_rec_move_to_front(lock, rec_fold);
-                granted_locks.push_back(lock);
+                new_granted.push_back(lock);
+                sub_dep_size_total -= lock->trx->dep_size + 1;
+            } else {
+                add_dep_size_total += lock->trx->dep_size + 1;
             }
         }
+        for (i = 0; i < granted_locks.size(); ++i) {
+            lock = granted_locks[i];
+            update_dep_size(lock->trx, sub_dep_size_total);
+        }
+        for (i = 0; i < new_granted.size(); ++i) {
+            lock = new_granted[i];
+            update_dep_size(lock->trx, add_dep_size_total);
+        }
+
     }
 
 	lock_mutex_exit();
