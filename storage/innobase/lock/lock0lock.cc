@@ -2034,7 +2034,7 @@ update_dep_size(
                 total_size_delta += lock->trx->dep_size + 1;
             }
         }
-        update_dep_size(lock->trx, total_size_delta);
+        update_dep_size(in_lock->trx, total_size_delta);
     }
 }
 
