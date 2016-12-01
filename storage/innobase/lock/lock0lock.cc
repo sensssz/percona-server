@@ -2018,6 +2018,7 @@ update_dep_size(
     page_no = in_lock->un_member.rec_lock.page_no;
 
     if (wait) {
+        in_lock->trx->size_updated = true;
         for (lock = lock_rec_get_first(space, page_no, heap_no);
              lock != NULL;
              lock = lock_rec_get_next(heap_no, lock)) {
@@ -2027,6 +2028,7 @@ update_dep_size(
                 ut_a(lock->trx->dep_size > in_lock->trx->dep_size);
             }
         }
+        in_lock->trx->size_updated = false;
     } else {
         total_size_delta = 0;
         for (lock = lock_rec_get_first(space, page_no, heap_no);
