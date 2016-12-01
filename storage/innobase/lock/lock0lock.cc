@@ -1951,7 +1951,7 @@ void
 reset_trx_size_updated()
 {
     trx_t *trx;
-    for (trx = UT_LIST_GET_FIRST(trx_sys->rw_trx_list);
+    for (trx = UT_LIST_GET_FIRST(trx_sys->mysql_trx_list);
          trx != NULL;
          trx = UT_LIST_GET_NEXT(trx_list, trx)) {
         trx->size_updated = false;
@@ -1970,16 +1970,19 @@ update_dep_size(
     ulint   heap_no;
     lock_t *lock;
 
-    if (trx->size_updated) {
+    if (trx->size_updated || size_delta == 0) {
         return;
     }
 
     trx->size_updated = true;
-    ib_logf(IB_LOG_LEVEL_INFO, "trx %lu updated from %ld->%ld", trx->id, trx->dep_size, trx->dep_size + size_delta);
+    ib_logf(IB_LOG_LEVEL_INFO, "trx %llu updated from %ld->%ld", trx->id, trx->dep_size, trx->dep_size + size_delta);
     trx->dep_size += size_delta;
     ut_a(trx->dep_size >= 0);
     if (trx->state != TRX_STATE_ACTIVE
         || trx->lock.wait_lock == NULL) {
+        if (depth == 1) {
+            reset_trx_size_updated();
+        }
         return;
     }
 
@@ -2021,7 +2024,7 @@ update_dep_size(
              lock = lock_rec_get_next(heap_no, lock)) {
             if (!lock_get_wait(lock)
                 && in_lock->trx != lock->trx) {
-                ib_logf(IB_LOG_LEVEL_INFO, "Update trx %lu using %lu", lock->trx->id, in_lock->trx->id);
+                ib_logf(IB_LOG_LEVEL_INFO, "Update trx %llu using %llu", lock->trx->id, in_lock->trx->id);
                 in_lock->trx->size_updated = true;
                 update_dep_size(lock->trx, in_lock->trx->dep_size + 1);
                 in_lock->trx->size_updated = true;
