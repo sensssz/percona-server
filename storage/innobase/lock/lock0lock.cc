@@ -2799,44 +2799,7 @@ lock_rec_dequeue_from_page(
                     wait_locks.push_back(lock);
                 }
             }
-//            if (wait_locks.size() > 0) {
-//                fprintf(stderr, "Before sorting: [");
-//                for (i = 0; i < wait_locks.size(); ++i) {
-//                    lock = wait_locks[i];
-//                    fprintf(stderr, "%lu,", lock->trx->id);
-//                }
-//                fprintf(stderr, "]\nAfter sorting: [");
-//            }
-//            if (wait_locks.size() > 1) {
-//                fcfs_granted = granted_locks;
-//                vats_granted = granted_locks;
-//                for (i = 0; i < wait_locks.size(); ++i) {
-//                    lock = wait_locks[i];
-//                    if (!lock_rec_has_to_wait_granted(lock, fcfs_granted)) {
-//                        fcfs_granted.push_back(lock);
-//                    }
-//                }
-//                std::sort(wait_locks.begin(), wait_locks.end(), has_higher_priority);
-//                for (i = 0; i < wait_locks.size(); ++i) {
-//                    lock = wait_locks[i];
-//                    if (!lock_rec_has_to_wait_granted(lock, vats_granted)) {
-//                        vats_granted.push_back(lock);
-//                    }
-//                }
-//                int diff = set_diff(fcfs_granted, vats_granted);
-////                fprintf(stderr, "Set diff: %d\n", diff);
-//                total_schedule++;
-//                has_diff_schedule += diff > 0;
-//                schedule_total += fcfs_granted.size() + vats_granted.size() - 2 * granted_locks.size();
-//                schedule_diff += diff;
-//            }
-//            if (wait_locks.size() > 0) {
-//                for (i = 0; i < wait_locks.size(); ++i) {
-//                    lock = wait_locks[i];
-//                    fprintf(stderr, "%lu,", lock->trx->id);
-//                }
-//                fprintf(stderr, "]\nGranted: [");
-//            }
+            std::sort(wait_locks.begin(), wait_locks.end(), has_higher_priority);
             for (i = 0; i < wait_locks.size(); ++i) {
                 lock = wait_locks[i];
                 if (!lock_rec_has_to_wait_granted(lock, granted_locks)) {
@@ -2845,12 +2808,8 @@ lock_rec_dequeue_from_page(
                                 rec_fold, lock);
                     lock_rec_move_to_front(lock, rec_fold);
                     granted_locks.push_back(lock);
-//                    fprintf(stderr, "%lu,", lock->trx->id);
                 }
             }
-//            if (wait_locks.size() > 0) {
-//                fprintf(stderr, "]\n");
-//            }
         }
     }
 }
