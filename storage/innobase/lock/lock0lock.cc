@@ -1976,6 +1976,7 @@ update_dep_size(
 
     trx->size_updated = true;
     trx->dep_size += size_delta;
+    ut_a(trx->dep_size >= 0);
     if (trx->state != TRX_STATE_ACTIVE
         || trx->lock.wait_lock == NULL) {
         return;
@@ -1989,7 +1990,8 @@ update_dep_size(
          lock = lock_rec_get_next(heap_no, lock)) {
         if (!lock_get_wait(lock)
             && trx != lock->trx) {
-            update_dep_size(trx, size_delta, depth + 1);
+            update_dep_size(lock->trx, size_delta, depth + 1);
+            ut_a(lock->trx->dep_size > trx->dep_size);
         }
     }
     if (depth == 1) {
@@ -2019,6 +2021,7 @@ update_dep_size(
             if (!lock_get_wait(lock)
                 && in_lock->trx != lock->trx) {
                 update_dep_size(lock->trx, in_lock->trx->dep_size + 1);
+                ut_a(lock->trx->dep_size > in_lock->trx->dep_size);
             }
         }
     } else {
