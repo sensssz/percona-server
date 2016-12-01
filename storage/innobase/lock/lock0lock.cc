@@ -2028,6 +2028,9 @@ update_dep_size(
                 && in_lock->trx != lock->trx) {
                 ib_logf(IB_LOG_LEVEL_INFO, "Update trx %lu using %lu", lock->trx->id, in_lock->trx->id);
                 update_dep_size(lock->trx, in_lock->trx->dep_size + 1, true);
+                if (lock->trx->dep_size <= in_lock->trx->dep_size) {
+                    ib_logf(IB_LOG_LEVEL_INFO, "%lu: %lu, %lu: %lu", lock->trx->id, lock->trx->dep_size, in_lock->trx->id, in_lock->trx->dep_size);
+                }
                 ut_a(lock->trx->dep_size > in_lock->trx->dep_size);
             }
         }
