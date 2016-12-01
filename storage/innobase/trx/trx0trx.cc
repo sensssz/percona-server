@@ -1105,6 +1105,9 @@ trx_start_low(
 
     clock_gettime(CLOCK_REALTIME, &trx->start_time_nano);
 
+    trx->dep_size = 0;
+    trx->size_updated = false;
+
 	MONITOR_INC(MONITOR_TRX_ACTIVE);
 }
 
