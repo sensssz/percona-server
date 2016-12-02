@@ -2934,7 +2934,7 @@ lock_rec_dequeue_from_page(
                 for (j = 0; j < new_granted.size(); ++j) {
                     new_granted_lock = new_granted[j];
                     if (lock->trx == new_granted_lock->trx) {
-                        dep_size_compsensate += lock->trx->dep_size;
+                        dep_size_compsensate += lock->trx->dep_size + 1;
                     }
                 }
                 if (lock->trx != in_lock->trx) {
