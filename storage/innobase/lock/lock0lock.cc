@@ -1982,6 +1982,9 @@ update_dep_size(
     trx->size_updated = true;
     ib_logf(IB_LOG_LEVEL_INFO, "trx %lu updated from %ld->%ld", trx->id, trx->dep_size, trx->dep_size + size_delta);
     trx->dep_size += size_delta;
+    if (trx->dep_size < 0) {
+        trx->dep_size = 0;
+    }
     ut_a(trx->dep_size >= 0);
     if (trx->state != TRX_STATE_ACTIVE
         || trx->lock.wait_lock == NULL) {
