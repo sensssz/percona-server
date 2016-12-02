@@ -2003,7 +2003,6 @@ update_dep_size(
             if (lock->trx->dep_size <= trx->dep_size) {
                 ib_logf(IB_LOG_LEVEL_INFO, "%lu: %lu, %lu: %lu", lock->trx->id, lock->trx->dep_size, trx->id, trx->dep_size);
             }
-            ut_a(lock->trx->dep_size > trx->dep_size);
         } else if (trx == lock->trx) {
             lock->trx->dep_size *= 2;
             ++lock->trx->dep_size;
@@ -2042,7 +2041,6 @@ update_dep_size(
                 if (lock->trx->dep_size <= in_lock->trx->dep_size) {
                     ib_logf(IB_LOG_LEVEL_INFO, "%lu: %lu, %lu: %lu", lock->trx->id, lock->trx->dep_size, in_lock->trx->id, in_lock->trx->dep_size);
                 }
-                ut_a(lock->trx->dep_size > in_lock->trx->dep_size);
             } else if (in_lock->trx == lock->trx) {
                 lock->trx->dep_size *= 2;
                 ++lock->trx->dep_size;
