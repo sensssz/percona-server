@@ -2838,11 +2838,14 @@ lock_rec_dequeue_from_page(
 	ulint		page_no;
     ulint       heap_no;
     ulint       rec_fold;
-	lock_t*		lock;
+    lock_t*		lock;
+    lock_t*		new_granted_lock;
     trx_lock_t*	trx_lock;
     ulint       i;
+    ulint       j;
     long        sub_dep_size_total;
     long        add_dep_size_total;
+    long        dep_size_compsensate;
     std::vector<lock_t *> wait_locks;
     std::vector<lock_t *> granted_locks;
     std::vector<lock_t *> new_granted;
@@ -2930,8 +2933,15 @@ lock_rec_dequeue_from_page(
             }
             for (i = 0; i < granted_locks.size(); ++i) {
                 lock = granted_locks[i];
+                dep_size_compsensate = 0;
+                for (j = 0; j < new_granted.size(); ++j) {
+                    new_granted_lock = new_granted[j];
+                    if (lock->trx == new_granted_lock->trx) {
+                        dep_size_compsensate += lock->trx->dep_size;
+                    }
+                }
                 if (lock->trx != in_lock->trx) {
-                    update_dep_size(lock->trx, sub_dep_size_total);
+                    update_dep_size(lock->trx, sub_dep_size_total + dep_size_compsensate);
                 }
             }
             for (i = 0; i < new_granted.size(); ++i) {
