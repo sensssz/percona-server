@@ -1981,12 +1981,11 @@ update_dep_size(
     }
 
     trx->size_updated = true;
-    ib_logf(IB_LOG_LEVEL_INFO, "trx %lu updated from %ld->%ld", trx->id, trx->dep_size, trx->dep_size + size_delta);
+//    ib_logf(IB_LOG_LEVEL_INFO, "trx %lu updated from %ld->%ld", trx->id, trx->dep_size, trx->dep_size + size_delta);
     trx->dep_size += size_delta;
     ut_a(trx->dep_size >= 0);
     if (trx->state != TRX_STATE_ACTIVE
-        || trx->lock.wait_lock == NULL
-        || enqueuing) {
+        || trx->lock.wait_lock == NULL) {
         if (depth == 1) {
             reset_trx_size_updated();
         }
@@ -2033,10 +2032,10 @@ update_dep_size(
             if (!lock_get_wait(lock)
                 && in_lock->trx != lock->trx) {
                 ut_a(!lock->trx->size_updated);
-                ib_logf(IB_LOG_LEVEL_INFO, "Update trx %lu using %lu", lock->trx->id, in_lock->trx->id);
+//                ib_logf(IB_LOG_LEVEL_INFO, "Update trx %lu using %lu", lock->trx->id, in_lock->trx->id);
                 update_dep_size(lock->trx, in_lock->trx->dep_size + 1, true);
                 if (lock->trx->dep_size <= in_lock->trx->dep_size) {
-                    ib_logf(IB_LOG_LEVEL_INFO, "%lu: %lu, %lu: %lu", lock->trx->id, lock->trx->dep_size, in_lock->trx->id, in_lock->trx->dep_size);
+//                    ib_logf(IB_LOG_LEVEL_INFO, "%lu: %lu, %lu: %lu", lock->trx->id, lock->trx->dep_size, in_lock->trx->id, in_lock->trx->dep_size);
                 }
                 ut_a(lock->trx->dep_size > in_lock->trx->dep_size);
             }
