@@ -2927,11 +2927,15 @@ lock_rec_dequeue_from_page(
             }
             for (i = 0; i < granted_locks.size(); ++i) {
                 lock = granted_locks[i];
-                update_dep_size(lock->trx, sub_dep_size_total);
+                if (lock->trx != in_lock->trx) {
+                    update_dep_size(lock->trx, sub_dep_size_total);
+                }
             }
             for (i = 0; i < new_granted.size(); ++i) {
                 lock = new_granted[i];
-                update_dep_size(lock->trx, add_dep_size_total);
+                if (lock->trx != in_lock->trx) {
+                    update_dep_size(lock->trx, add_dep_size_total);
+                }
             }
         }
     }
