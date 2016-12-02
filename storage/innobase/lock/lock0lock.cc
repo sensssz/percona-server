@@ -2003,6 +2003,9 @@ update_dep_size(
         if (!lock_get_wait(lock)
             && trx != lock->trx) {
             update_dep_size(lock->trx, size_delta, depth + 1);
+            if (lock->trx->dep_size <= trx->dep_size) {
+                ib_logf(IB_LOG_LEVEL_INFO, "%lu: %lu, %lu: %lu", lock->trx->id, lock->trx->dep_size, trx->id, trx->dep_size);
+            }
             ut_a(lock->trx->dep_size > trx->dep_size);
         } else if (trx == lock->trx) {
             lock->trx->dep_size *= 2;
