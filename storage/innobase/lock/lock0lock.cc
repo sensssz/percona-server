@@ -2006,9 +2006,6 @@ update_dep_size(
             if (lock->trx->dep_size <= trx->dep_size) {
                 ib_logf(IB_LOG_LEVEL_INFO, "%lu: %lu, %lu: %lu", lock->trx->id, lock->trx->dep_size, trx->id, trx->dep_size);
             }
-        } else if (trx == lock->trx) {
-            lock->trx->dep_size *= 2;
-            ++lock->trx->dep_size;
         }
     }
     if (depth == 1) {
@@ -2044,9 +2041,6 @@ update_dep_size(
                 if (lock->trx->dep_size <= in_lock->trx->dep_size) {
                     ib_logf(IB_LOG_LEVEL_INFO, "%lu: %lu, %lu: %lu", lock->trx->id, lock->trx->dep_size, in_lock->trx->id, in_lock->trx->dep_size);
                 }
-            } else if (in_lock->trx == lock->trx) {
-                lock->trx->dep_size *= 2;
-                ++lock->trx->dep_size;
             }
         }
     } else {
@@ -2844,6 +2838,7 @@ lock_rec_dequeue_from_page(
     ulint       heap_no;
     ulint       rec_fold;
     lock_t*		lock;
+    lock_t*		wait_lock;
     lock_t*		new_granted_lock;
     trx_lock_t*	trx_lock;
     ulint       i;
@@ -2953,9 +2948,17 @@ lock_rec_dequeue_from_page(
             }
             for (i = 0; i < new_granted.size(); ++i) {
                 lock = new_granted[i];
+                dep_size_compsensate = 0;
+                for (j = 0; j < wait_locks.size(); ++j) {
+                    wait_lock = wait_locks[j];
+                    if (lock_get_wait(wait_lock)
+                        && lock->trx == wait_lock->trx) {
+                        dep_size_compsensate -= lock->trx->dep_size + 1;
+                    }
+                }
                 if (lock->trx != in_lock->trx) {
                     ib_logf(IB_LOG_LEVEL_INFO, "Update for trx with newly granted lock %lu", lock->trx->id);
-                    update_dep_size(lock->trx, add_dep_size_total);
+                    update_dep_size(lock->trx, add_dep_size_total + dep_size_compsensate);
                 }
             }
         }
