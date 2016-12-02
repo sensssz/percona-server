@@ -2890,6 +2890,7 @@ lock_rec_dequeue_from_page(
         }
         last_update = now;
 
+        ib_logf(IB_LOG_LEVEL_INFO, "%lu is released!", in_lock->trx->id);
         for (heap_no = 0; heap_no < lock_rec_get_n_bits(in_lock); ++heap_no) {
             if (!lock_rec_get_nth_bit(in_lock, heap_no)) {
                 continue;
