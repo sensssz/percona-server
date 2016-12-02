@@ -2023,6 +2023,9 @@ update_dep_size(
     ulint   heap_no,
     bool    wait)
 {
+    if (innodb_lock_schedule_algorithm == INNODB_LOCK_SCHEDULE_ALGORITHM_FCFS) {
+        return;
+    }
     lock_t *lock;
     ulint   space;
     ulint   page_no;
@@ -2031,14 +2034,12 @@ update_dep_size(
     space = in_lock->un_member.rec_lock.space;
     page_no = in_lock->un_member.rec_lock.page_no;
 
-    ut_a(!in_lock->trx->size_updated);
     if (wait) {
         for (lock = lock_rec_get_first(space, page_no, heap_no);
              lock != NULL;
              lock = lock_rec_get_next(heap_no, lock)) {
             if (!lock_get_wait(lock)
                 && in_lock->trx != lock->trx) {
-                ut_a(!lock->trx->size_updated);
 //                ib_logf(IB_LOG_LEVEL_INFO, "Update trx %lu using %lu", lock->trx->id, in_lock->trx->id);
                 update_dep_size(lock->trx, in_lock->trx->dep_size + 1);
 //                if (lock->trx->dep_size <= in_lock->trx->dep_size) {
