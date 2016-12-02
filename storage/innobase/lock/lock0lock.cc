@@ -1983,7 +1983,7 @@ update_dep_size(
     }
 
     trx->size_updated = true;
-    ib_logf(IB_LOG_LEVEL_INFO, "trx %lu updated from %ld->%ld", trx->id, trx->dep_size, trx->dep_size + size_delta);
+//    ib_logf(IB_LOG_LEVEL_INFO, "trx %lu updated from %ld->%ld", trx->id, trx->dep_size, trx->dep_size + size_delta);
     trx->dep_size += size_delta;
     if (trx->dep_size < 0) {
         trx->dep_size = 0;
@@ -2006,9 +2006,9 @@ update_dep_size(
         if (!lock_get_wait(lock)
             && trx != lock->trx) {
             update_dep_size(lock->trx, size_delta, depth + 1);
-            if (lock->trx->dep_size <= trx->dep_size) {
-                ib_logf(IB_LOG_LEVEL_INFO, "%lu: %lu, %lu: %lu", lock->trx->id, lock->trx->dep_size, trx->id, trx->dep_size);
-            }
+//            if (lock->trx->dep_size <= trx->dep_size) {
+//                ib_logf(IB_LOG_LEVEL_INFO, "%lu: %lu, %lu: %lu", lock->trx->id, lock->trx->dep_size, trx->id, trx->dep_size);
+//            }
         }
     }
     if (depth == 1) {
@@ -2039,11 +2039,11 @@ update_dep_size(
             if (!lock_get_wait(lock)
                 && in_lock->trx != lock->trx) {
                 ut_a(!lock->trx->size_updated);
-                ib_logf(IB_LOG_LEVEL_INFO, "Update trx %lu using %lu", lock->trx->id, in_lock->trx->id);
+//                ib_logf(IB_LOG_LEVEL_INFO, "Update trx %lu using %lu", lock->trx->id, in_lock->trx->id);
                 update_dep_size(lock->trx, in_lock->trx->dep_size + 1);
-                if (lock->trx->dep_size <= in_lock->trx->dep_size) {
-                    ib_logf(IB_LOG_LEVEL_INFO, "%lu: %lu, %lu: %lu", lock->trx->id, lock->trx->dep_size, in_lock->trx->id, in_lock->trx->dep_size);
-                }
+//                if (lock->trx->dep_size <= in_lock->trx->dep_size) {
+//                    ib_logf(IB_LOG_LEVEL_INFO, "%lu: %lu, %lu: %lu", lock->trx->id, lock->trx->dep_size, in_lock->trx->id, in_lock->trx->dep_size);
+//                }
             }
         }
     } else {
@@ -2897,7 +2897,7 @@ lock_rec_dequeue_from_page(
         }
         last_update = now;
 
-        ib_logf(IB_LOG_LEVEL_INFO, "%lu is released!", in_lock->trx->id);
+//        ib_logf(IB_LOG_LEVEL_INFO, "%lu is released!", in_lock->trx->id);
         for (heap_no = 0; heap_no < lock_rec_get_n_bits(in_lock); ++heap_no) {
             if (!lock_rec_get_nth_bit(in_lock, heap_no)) {
                 continue;
@@ -2945,7 +2945,7 @@ lock_rec_dequeue_from_page(
                     }
                 }
                 if (lock->trx != in_lock->trx) {
-                    ib_logf(IB_LOG_LEVEL_INFO, "Update for trx with granted lock %lu", lock->trx->id);
+//                    ib_logf(IB_LOG_LEVEL_INFO, "Update for trx with granted lock %lu", lock->trx->id);
                     update_dep_size(lock->trx, sub_dep_size_total + dep_size_compsensate);
                 }
             }
@@ -2960,7 +2960,7 @@ lock_rec_dequeue_from_page(
                     }
                 }
                 if (lock->trx != in_lock->trx) {
-                    ib_logf(IB_LOG_LEVEL_INFO, "Update for trx with newly granted lock %lu", lock->trx->id);
+//                    ib_logf(IB_LOG_LEVEL_INFO, "Update for trx with newly granted lock %lu", lock->trx->id);
                     update_dep_size(lock->trx, add_dep_size_total + dep_size_compsensate);
                 }
             }
