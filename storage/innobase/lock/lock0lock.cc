@@ -2004,6 +2004,9 @@ update_dep_size(
             && trx != lock->trx) {
             update_dep_size(lock->trx, size_delta, depth + 1);
             ut_a(lock->trx->dep_size > trx->dep_size);
+        } else if (trx == lock->trx) {
+            lock->trx->dep_size *= 2;
+            ++lock->trx->dep_size;
         }
     }
     if (depth == 1) {
@@ -2040,6 +2043,9 @@ update_dep_size(
                     ib_logf(IB_LOG_LEVEL_INFO, "%lu: %lu, %lu: %lu", lock->trx->id, lock->trx->dep_size, in_lock->trx->id, in_lock->trx->dep_size);
                 }
                 ut_a(lock->trx->dep_size > in_lock->trx->dep_size);
+            } else if (in_lock->trx == lock->trx) {
+                lock->trx->dep_size *= 2;
+                ++lock->trx->dep_size;
             }
         }
     } else {
