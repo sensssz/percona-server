@@ -1971,7 +1971,6 @@ void
 update_dep_size(
     trx_t  *trx,
     long    size_delta,
-    bool    enqueuing=false,
     long    depth=1)
 {
     ulint   space;
@@ -2036,7 +2035,7 @@ update_dep_size(
                 && in_lock->trx != lock->trx) {
                 ut_a(!lock->trx->size_updated);
                 ib_logf(IB_LOG_LEVEL_INFO, "Update trx %lu using %lu", lock->trx->id, in_lock->trx->id);
-                update_dep_size(lock->trx, in_lock->trx->dep_size + 1, true);
+                update_dep_size(lock->trx, in_lock->trx->dep_size + 1);
                 if (lock->trx->dep_size <= in_lock->trx->dep_size) {
                     ib_logf(IB_LOG_LEVEL_INFO, "%lu: %lu, %lu: %lu", lock->trx->id, lock->trx->dep_size, in_lock->trx->id, in_lock->trx->dep_size);
                 }
