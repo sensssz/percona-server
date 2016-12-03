@@ -1869,67 +1869,6 @@ has_higher_priority(
 }
 
 static
-dberr_t
-lock_rec_insert_by_trx_age(
-  lock_t *in_lock,
-  bool wait)
-{
-    ulint               space;
-    ulint               page_no;
-    ulint				rec_fold;
-    hash_table_t*       hash;
-    hash_cell_t*        cell;
-    lock_t*				node;
-    lock_t*				next;
-
-    space = in_lock->un_member.rec_lock.space;
-    page_no = in_lock->un_member.rec_lock.page_no;
-    rec_fold = lock_rec_fold(space, page_no);
-    hash = lock_sys->rec_hash;
-    cell = hash_get_nth_cell(hash,
-                             hash_calc_hash(rec_fold, hash));
-
-    node = (lock_t *) cell->node;
-    // If in_lock is not a wait lock, we insert it to the head of the list.
-    if (node == NULL || !lock_get_wait(in_lock) || has_higher_priority(in_lock, node)) {
-        cell->node = in_lock;
-        in_lock->hash = node;
-        return DB_SUCCESS;
-    }
-    while (node != NULL && has_higher_priority((lock_t *) node->hash,
-                                               in_lock)) {
-        node = (lock_t *) node->hash;
-    }
-    next = (lock_t *) node->hash;
-    node->hash = in_lock;
-    in_lock->hash = next;
-    
-    return DB_SUCCESS;
-}
-
-static
-void
-lock_rec_insert_to_head(
-	lock_t *in_lock,   /*!< in: lock to be insert */
-    ulint   rec_fold)  /*!< in: rec_fold of the page */
-{
-    hash_cell_t*        cell;
-    lock_t*				node;
-    
-    if (in_lock == NULL) {
-        return;
-    }
-
-    cell = hash_get_nth_cell(lock_sys->rec_hash,
-                             hash_calc_hash(rec_fold, lock_sys->rec_hash));
-    node = (lock_t *) cell->node;
-    if (node != in_lock) {
-        cell->node = in_lock;
-        in_lock->hash = node;
-    }
-}
-
-static
 lock_t *
 lock_rec_get_first(
     ulint   space,
@@ -1980,7 +1919,6 @@ update_dep_size(
     }
 
     trx->size_updated = true;
-//    ib_logf(IB_LOG_LEVEL_INFO, "trx %lu updated from %ld->%ld", trx->id, trx->dep_size, trx->dep_size + size_delta);
     trx->dep_size += size_delta;
     if (trx->dep_size < 0) {
         trx->dep_size = 0;
@@ -2003,9 +1941,6 @@ update_dep_size(
         if (!lock_get_wait(lock)
             && trx != lock->trx) {
             update_dep_size(lock->trx, size_delta, depth + 1);
-//            if (lock->trx->dep_size <= trx->dep_size) {
-//                ib_logf(IB_LOG_LEVEL_INFO, "%lu: %lu, %lu: %lu", lock->trx->id, lock->trx->dep_size, trx->id, trx->dep_size);
-//            }
         }
     }
     if (depth == 1) {
@@ -2037,11 +1972,7 @@ update_dep_size(
              lock = lock_rec_get_next(heap_no, lock)) {
             if (!lock_get_wait(lock)
                 && in_lock->trx != lock->trx) {
-//                ib_logf(IB_LOG_LEVEL_INFO, "Update trx %lu using %lu", lock->trx->id, in_lock->trx->id);
                 update_dep_size(lock->trx, in_lock->trx->dep_size + 1);
-//                if (lock->trx->dep_size <= in_lock->trx->dep_size) {
-//                    ib_logf(IB_LOG_LEVEL_INFO, "%lu: %lu, %lu: %lu", lock->trx->id, lock->trx->dep_size, in_lock->trx->id, in_lock->trx->dep_size);
-//                }
             }
         }
     } else {
@@ -2802,23 +2733,6 @@ lock_rec_move_to_front(
     }
 }
 
-static
-ulint
-set_diff(
-    std::vector<lock_t *> &word1,
-    std::vector<lock_t *> &word2)
-{
-    std::vector<lock_t *> diff(word1.size() + word2.size());
-    std::sort(word1.begin(), word1.end());
-    std::sort(word2.begin(), word2.end());
-    std::vector<lock_t *>::iterator it = std::set_symmetric_difference(word1.begin(),
-                                                             word1.end(),
-                                                             word2.begin(),
-                                                             word2.end(),
-                                                             diff.begin());
-    return it - diff.begin();
-}
-
 /*************************************************************//**
 Removes a record lock request, waiting or granted, from the queue and
 grants locks to other transactions in the queue if they now are entitled
@@ -2887,15 +2801,6 @@ lock_rec_dequeue_from_page(
             }
         }
     } else {
-        time_t now;
-        time(&now);
-        if (difftime(now, last_update) > 10) {
-            total_schedule = 0;
-            has_diff_schedule = 0;
-        }
-        last_update = now;
-
-//        ib_logf(IB_LOG_LEVEL_INFO, "%lu is released!", in_lock->trx->id);
         for (heap_no = 0; heap_no < lock_rec_get_n_bits(in_lock); ++heap_no) {
             if (!lock_rec_get_nth_bit(in_lock, heap_no)) {
                 continue;
@@ -2943,7 +2848,6 @@ lock_rec_dequeue_from_page(
                     }
                 }
                 if (lock->trx != in_lock->trx) {
-//                    ib_logf(IB_LOG_LEVEL_INFO, "Update for trx with granted lock %lu", lock->trx->id);
                     update_dep_size(lock->trx, sub_dep_size_total + dep_size_compsensate);
                 }
             }
@@ -2958,7 +2862,6 @@ lock_rec_dequeue_from_page(
                     }
                 }
                 if (lock->trx != in_lock->trx) {
-//                    ib_logf(IB_LOG_LEVEL_INFO, "Update for trx with newly granted lock %lu", lock->trx->id);
                     update_dep_size(lock->trx, add_dep_size_total + dep_size_compsensate);
                 }
             }
