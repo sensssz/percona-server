@@ -2127,7 +2127,6 @@ lock_rec_enqueue_waiting(
 	ulint			sec;
 	ulint			ms;
     dberr_t         err;
-    ulint           rec_fold;
 
 
 	ut_ad(lock_mutex_own());
