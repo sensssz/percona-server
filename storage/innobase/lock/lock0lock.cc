@@ -1869,6 +1869,15 @@ has_higher_priority(
 }
 
 static
+bool
+use_vats(
+    trx_t *trx)
+{
+    return innodb_lock_schedule_algorithm == INNODB_LOCK_SCHEDULE_ALGORITHM_VATS
+        && !thd_is_replication_slave_thread(trx->mysql_thd);
+}
+
+static
 lock_t *
 lock_rec_get_first(
     ulint   space,
@@ -1914,7 +1923,7 @@ update_dep_size(
     ulint   heap_no;
     lock_t *lock;
 
-    if (trx->size_updated || size_delta == 0) {
+    if (!use_vats(trx) || trx->size_updated || size_delta == 0) {
         return;
     }
 
@@ -1955,9 +1964,10 @@ update_dep_size(
     ulint   heap_no,
     bool    wait)
 {
-    if (innodb_lock_schedule_algorithm == INNODB_LOCK_SCHEDULE_ALGORITHM_FCFS) {
+    if (!use_vats(in_lock->trx)) {
         return;
     }
+
     lock_t *lock;
     ulint   space;
     ulint   page_no;
