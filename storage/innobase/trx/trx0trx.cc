@@ -1513,7 +1513,8 @@ trx_start_low(
 	} else {
 		trx->start_time = ut_time();
 	}
-    trx->start_time_micro = clock();
+    trx->dep_size = 0;
+    trx->size_updated = false;
 
 	ut_a(trx->error_state == DB_SUCCESS);
 
