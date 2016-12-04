@@ -1582,11 +1582,6 @@ reset_trx_size_updated()
          trx = UT_LIST_GET_NEXT(trx_list, trx)) {
         trx->size_updated = false;
     }
-    for (trx = UT_LIST_GET_FIRST(trx_sys->ro_trx_list);
-         trx != NULL;
-         trx = UT_LIST_GET_NEXT(trx_list, trx)) {
-        trx->size_updated = false;
-    }
 }
 
 static
@@ -2684,7 +2679,6 @@ vats_grant(
 {
     ulint		space;
     ulint		page_no;
-    ulint       heap_no;
     ulint       rec_fold;
     lock_t*		lock;
     lock_t*		wait_lock;
@@ -4566,68 +4560,6 @@ run_again:
 }
 
 /*=========================== LOCK RELEASE ==============================*/
-static
-void
-lock_grant_and_move_on_rec(
-    hash_table_t *lock_hash,
-    lock_t       *first_lock,
-    ulint         heap_no)
-{
-    lock_t*		lock;
-    lock_t*		previous;
-    ulint		space;
-    ulint		page_no;
-    ulint       rec_fold;
-    
-    space = first_lock->un_member.rec_lock.space;
-    page_no = first_lock->un_member.rec_lock.page_no;
-    rec_fold = lock_rec_fold(space, page_no);
-    
-    previous = (lock_t *) hash_get_nth_cell(lock_hash,
-                                            hash_calc_hash(rec_fold, lock_hash))->node;
-    if (previous == NULL) {
-        return;
-    }
-    if (previous == first_lock) {
-        lock = previous;
-    } else {
-        while (previous->hash &&
-               previous->hash != first_lock) {
-            previous = previous->hash;
-        }
-        lock = previous->hash;
-    }
-    /* Grant locks if there are no conflicting locks ahead.
-     Move granted locks to the head of the list. */
-    for (;lock != NULL;) {
-        
-        /* If the lock is a wait lock on this page, and it does not need to wait. */
-        if (lock->un_member.rec_lock.space == space
-            && lock->un_member.rec_lock.page_no == page_no
-            && lock_rec_get_nth_bit(lock, heap_no)
-            && lock_get_wait(lock)
-            && !lock_rec_has_to_wait_in_queue(lock)) {
-            
-            lock_grant(lock, false);
-            
-            if (previous != NULL) {
-                /* Move the lock to the head of the list. */
-                HASH_GET_NEXT(hash, previous) = HASH_GET_NEXT(hash, lock);
-                lock_rec_insert_to_head(lock, rec_fold);
-            } else {
-                /* Already at the head of the list. */
-                previous = lock;
-            }
-            /* Move on to the next lock. */
-            lock = static_cast<lock_t *>(HASH_GET_NEXT(hash, previous));
-        } else {
-            previous = lock;
-            lock = static_cast<lock_t *>(HASH_GET_NEXT(hash, lock));
-        }
-    }
-}
-
-
 /*************************************************************//**
 Removes a granted record lock of a transaction from the queue and grants
 locks to other transactions waiting in the queue if they now are entitled
@@ -4641,24 +4573,11 @@ lock_rec_unlock(
 	const rec_t*		rec,	/*!< in: record */
 	lock_mode		lock_mode)/*!< in: LOCK_S or LOCK_X */
 {
-    lock_t*		wait_lock;
-    lock_t*		new_granted_lock;
 	lock_t*		first_lock;
     lock_t*		lock;
-    ulint		space;
-    ulint		page_no;
     ulint		heap_no;
-    ulint       rec_fold;
 	const char*	stmt;
     size_t		stmt_len;
-    ulint       i;
-    ulint       j;
-    long        sub_dep_size_total;
-    long        add_dep_size_total;
-    long        dep_size_compsensate;
-    std::vector<lock_t *> wait_locks;
-    std::vector<lock_t *> granted_locks;
-    std::vector<lock_t *> new_granted;
 
 	ut_ad(trx);
 	ut_ad(rec);
@@ -5924,9 +5843,6 @@ lock_rec_queue_validate(
 			ut_a(lock_rec_has_to_wait_in_queue(lock));
 		}
     }
-    
-    ut_ad(innodb_lock_schedule_algorithm == INNODB_LOCK_SCHEDULE_ALGORITHM_FCFS ||
-          lock_queue_validate(lock));
 
 func_exit:
 	if (!locked_lock_trx_sys) {
