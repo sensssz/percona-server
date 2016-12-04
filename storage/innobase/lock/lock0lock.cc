@@ -1514,7 +1514,7 @@ RecLock::lock_alloc(
 }
 
 static
-char *
+const char *
 hash_table_name(
 	hash_table_t *lock_hash)
 {
@@ -7596,7 +7596,7 @@ DeadlockChecker::get_first_lock(ulint* heap_no) const
 			lock = lock_rec_get_next_const(*heap_no, lock);
 		}
 
-		if (!lock_get_wait(lock)) {
+		if (lock_get_wait(lock)) {
 			fprintf(stderr, "Assertion error for lock %p in hash table %s\n",
 					lock, hash_table_name(lock_hash));
 		}
