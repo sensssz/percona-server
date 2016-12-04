@@ -1550,7 +1550,8 @@ bool
 use_vats(
     trx_t *trx)
 {
-    return innodb_lock_schedule_algorithm == INNODB_LOCK_SCHEDULE_ALGORITHM_VATS
+    return innodb_lock_schedule_algorithm ==
+		   INNODB_LOCK_SCHEDULE_ALGORITHM_VATS
         && !thd_is_replication_slave_thread(trx->mysql_thd);
 }
 
@@ -1581,7 +1582,12 @@ reset_trx_size_updated()
          trx != NULL;
          trx = UT_LIST_GET_NEXT(trx_list, trx)) {
         trx->size_updated = false;
-    }
+	}
+	for (trx = UT_LIST_GET_FIRST(trx_sys->mysql_trx_list);
+		 trx != NULL;
+		 trx = UT_LIST_GET_NEXT(trx_list, trx)) {
+		trx->size_updated = false;
+	}
 }
 
 static
@@ -2715,7 +2721,7 @@ vats_grant(
         if (!lock_rec_has_to_wait_granted(lock, granted_locks)
             && !lock_rec_has_to_wait_granted(lock, new_granted)) {
             lock_grant(lock, false);
-            HASH_DELETE(lock_t, hash, lock_sys->rec_hash,
+            HASH_DELETE(lock_t, hash, lock_hash,
                         rec_fold, lock);
             lock_rec_move_to_front(lock, rec_fold);
             new_granted.push_back(lock);
@@ -7585,10 +7591,7 @@ DeadlockChecker::get_first_lock(ulint* heap_no) const
 	/* Must find at least two locks, otherwise there cannot be a
 	waiting lock, secondly the first lock cannot be the wait_lock. */
 	ut_a(lock != NULL);
-	ut_a(lock != m_wait_lock ||
-	     (innodb_lock_schedule_algorithm
-	      == INNODB_LOCK_SCHEDULE_ALGORITHM_VATS
-          && !thd_is_replication_slave_thread(lock->trx->mysql_thd)));
+	ut_a(lock != m_wait_lock || use_vats(lock->trx));
 
 	/* Check that the lock type doesn't change. */
 	ut_ad(lock_get_type_low(lock) == lock_get_type_low(m_wait_lock));
