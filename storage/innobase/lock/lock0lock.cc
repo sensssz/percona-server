@@ -2661,22 +2661,22 @@ lock_rec_has_to_wait_granted(
 static
 void
 lock_rec_move_to_front(
-    lock_t *lock_to_move,
+    lock_t *lock,
     ulint   rec_fold)
 {
-	hash_table_t *lock_hash = lock_hash_get(lock_to_move->type_mode);
+	hash_table_t *lock_hash = lock_hash_get(lock->type_mode);
 
-    if (lock_to_move != NULL)
+    if (lock != NULL)
 	{
 		HASH_DELETE(lock_t, hash, lock_hash,
 					rec_fold, lock);
         // Move the target lock to the head of the list
         hash_cell_t* cell = hash_get_nth_cell(lock_hash,
                                           hash_calc_hash(rec_fold, lock_hash));
-        if (lock_to_move != cell->node) {
+        if (lock != cell->node) {
             lock_t *next = (lock_t *) cell->node;
-            cell->node = lock_to_move;
-            lock_to_move->hash = next;
+            cell->node = lock;
+            lock->hash = next;
         }
     }
 }
