@@ -1513,6 +1513,20 @@ RecLock::lock_alloc(
 	return(lock);
 }
 
+static
+char *
+hash_table_name(
+	hash_table_t *lock_hash)
+{
+	if (lock_hash == lock_sys->rec_hash) {
+		return "rec_hash";
+	} else if (lock_hash == lock_sys->prdt_hash) {
+		return "prdt_hash";
+	} else {
+		return "prdt_page_hash";
+	}
+}
+
 /*********************************************************************//**
 Check if lock1 has higher priority than lock2.
 NULL has lowest priority.
@@ -1603,7 +1617,7 @@ update_dep_size(
     ulint   heap_no;
     lock_t *lock;
 	lock_t *wait_lock;
-    hash_table_t *hash;
+    hash_table_t *lock_hash;
 
     if (!use_vats(trx) || trx->size_updated || size_delta == 0) {
         return;
@@ -1626,8 +1640,8 @@ update_dep_size(
     space = wait_lock->un_member.rec_lock.space;
     page_no = wait_lock->un_member.rec_lock.page_no;
     heap_no = lock_rec_find_set_bit(wait_lock);
-    hash = lock_hash_get(wait_lock->type_mode);
-    for (lock = lock_rec_get_first(hash, space, page_no, heap_no);
+    lock_hash = lock_hash_get(wait_lock->type_mode);
+    for (lock = lock_rec_get_first(lock_hash, space, page_no, heap_no);
          lock != NULL;
          lock = lock_rec_get_next(heap_no, lock)) {
         if (!lock_get_wait(lock)
@@ -2674,6 +2688,7 @@ lock_rec_move_to_front(
 	// Move the target lock to the head of the list
 	cell = hash_get_nth_cell(lock_hash, hash_calc_hash(rec_fold, lock_hash));
 	if (lock != cell->node) {
+		fprintf(stderr, "Lock %p moved to head of hash table %s\n", lock, hash_table_name(lock_hash));
 		HASH_DELETE(lock_t, hash, lock_hash,
 					rec_fold, lock);
 		next = (lock_t *) cell->node;
@@ -2692,14 +2707,14 @@ vats_grant(
 	ulint		space;
 	ulint		page_no;
 	ulint       rec_fold;
-	lock_t*		lock;
-	lock_t*		wait_lock;
-	lock_t*		new_granted_lock;
 	ulint       i;
 	ulint       j;
 	long        sub_dep_size_total;
 	long        add_dep_size_total;
 	long        dep_size_compsensate;
+	lock_t*		lock;
+	lock_t*		wait_lock;
+	lock_t*		new_granted_lock;
 	std::vector<lock_t *> wait_locks;
 	std::vector<lock_t *> granted_locks;
 	std::vector<lock_t *> new_granted;
@@ -7579,6 +7594,11 @@ DeadlockChecker::get_first_lock(ulint* heap_no) const
 		/* Position on the first lock on the physical record.*/
 		if (!lock_rec_get_nth_bit(lock, *heap_no)) {
 			lock = lock_rec_get_next_const(*heap_no, lock);
+		}
+
+		if (!lock_get_wait(lock)) {
+			fprintf(stderr, "Assertion error for lock %p in hash table %s\n",
+					lock, hash_table_name(lock_hash));
 		}
 
 		ut_a(!lock_get_wait(lock));
