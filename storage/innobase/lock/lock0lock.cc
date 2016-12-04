@@ -2698,6 +2698,7 @@ vats_grant(
     space = released_lock->un_member.rec_lock.space;
     page_no = released_lock->un_member.rec_lock.page_no;
     rec_fold = lock_rec_fold(space, page_no);
+    lock_hash = lock_hash_get(released_lock->type_mode);
     for (lock = lock_rec_get_first(lock_hash, space, page_no, heap_no);
          lock != NULL;
          lock = lock_rec_get_next(heap_no, lock)) {
