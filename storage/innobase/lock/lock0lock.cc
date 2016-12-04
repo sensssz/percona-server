@@ -1601,6 +1601,7 @@ update_dep_size(
     ulint   page_no;
     ulint   heap_no;
     lock_t *lock;
+	lock_t *wait_lock;
     hash_table_t *hash;
 
     if (use_vats(trx) || trx->size_updated || size_delta == 0) {
@@ -1612,19 +1613,19 @@ update_dep_size(
     if (trx->dep_size < 0) {
         trx->dep_size = 0;
     }
-    ut_a(trx->dep_size >= 0);
+	wait_lock = trx->lock.wait_lock;
     if (trx->state != TRX_STATE_ACTIVE
-        || trx->lock.wait_lock == NULL) {
+        || wait_lock == NULL) {
         if (depth == 1) {
             reset_trx_size_updated();
         }
         return;
     }
 
-    space = trx->lock.wait_lock->un_member.rec_lock.space;
-    page_no = trx->lock.wait_lock->un_member.rec_lock.page_no;
-    heap_no = lock_rec_find_set_bit(trx->lock.wait_lock);
-    hash = lock_hash_get(trx->lock.wait_lock->type_mode);
+    space = wait_lock->un_member.rec_lock.space;
+    page_no = wait_lock->un_member.rec_lock.page_no;
+    heap_no = lock_rec_find_set_bit(wait_lock);
+    hash = lock_hash_get(wait_lock->type_mode);
     for (lock = lock_rec_get_first(hash, space, page_no, heap_no);
          lock != NULL;
          lock = lock_rec_get_next(heap_no, lock)) {
@@ -1645,21 +1646,22 @@ update_dep_size(
     ulint   heap_no,
     bool    wait)
 {
-    if (!use_vats(in_lock->trx)) {
-        return;
-    }
     lock_t *lock;
     ulint   space;
     ulint   page_no;
     long    total_size_delta;
-    hash_table_t *hash;
+	hash_table_t *lock_hash;
+
+	if (!use_vats(in_lock->trx)) {
+		return;
+	}
 
     space = in_lock->un_member.rec_lock.space;
     page_no = in_lock->un_member.rec_lock.page_no;
-    hash = lock_hash_get(in_lock->type_mode);
+    lock_hash = lock_hash_get(in_lock->type_mode);
 
     if (wait) {
-        for (lock = lock_rec_get_first(hash, space, page_no, heap_no);
+        for (lock = lock_rec_get_first(lock_hash, space, page_no, heap_no);
              lock != NULL;
              lock = lock_rec_get_next(heap_no, lock)) {
             if (!lock_get_wait(lock)
@@ -1669,7 +1671,7 @@ update_dep_size(
         }
     } else {
         total_size_delta = 0;
-        for (lock = lock_rec_get_first(hash, space, page_no, heap_no);
+        for (lock = lock_rec_get_first(lock_hash, space, page_no, heap_no);
              lock != NULL;
              lock = lock_rec_get_next(heap_no, lock)) {
             if (lock_get_wait(lock)
@@ -2661,24 +2663,22 @@ lock_rec_has_to_wait_granted(
 static
 void
 lock_rec_move_to_front(
+	hash_table_t *lock_hash,
     lock_t *lock,
     ulint   rec_fold)
 {
-	hash_table_t *lock_hash = lock_hash_get(lock->type_mode);
+	lock_t *next;
+	hash_cell_t* cell;
 
-    if (lock != NULL)
-	{
+	// Move the target lock to the head of the list
+	cell = hash_get_nth_cell(lock_hash, hash_calc_hash(rec_fold, lock_hash));
+	if (lock != cell->node) {
 		HASH_DELETE(lock_t, hash, lock_hash,
 					rec_fold, lock);
-        // Move the target lock to the head of the list
-        hash_cell_t* cell = hash_get_nth_cell(lock_hash,
-                                          hash_calc_hash(rec_fold, lock_hash));
-        if (lock != cell->node) {
-            lock_t *next = (lock_t *) cell->node;
-            cell->node = lock;
-            lock->hash = next;
-        }
-    }
+		next = (lock_t *) cell->node;
+		cell->node = lock;
+		lock->hash = next;
+	}
 }
 
 static
@@ -2725,7 +2725,7 @@ vats_grant(
         if (!lock_rec_has_to_wait_granted(lock, granted_locks)
             && !lock_rec_has_to_wait_granted(lock, new_granted)) {
             lock_grant(lock, false);
-            lock_rec_move_to_front(lock, rec_fold);
+            lock_rec_move_to_front(lock_hash, lock, rec_fold);
             new_granted.push_back(lock);
             sub_dep_size_total -= lock->trx->dep_size + 1;
         } else {
