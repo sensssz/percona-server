@@ -1600,9 +1600,6 @@ lock_rec_insert_to_head(
 
 	// Move the target lock to the head of the list
 	cell = hash_get_nth_cell(lock_hash, hash_calc_hash(rec_fold, lock_hash));
-	fprintf(stderr, "Lock %p(%u,%u,%lu) moved to head of hash table %s\n",
-			lock, lock->un_member.rec_lock.space, lock->un_member.rec_lock.page_no,
-			lock_rec_find_set_bit(lock), hash_table_name(lock_hash));
 	if (lock != cell->node) {
 		next = (lock_t *) cell->node;
 		cell->node = lock;
@@ -1752,14 +1749,8 @@ RecLock::lock_add(lock_t* lock, bool add_to_hash)
 
 		if (use_vats(lock->trx) && !wait) {
 			lock_rec_insert_to_head(lock_hash, lock, key);
-			fprintf(stderr, "Lock %p(%u,%u,%lu)[%s] inserted to head of hash table %s\n",
-					lock, lock->un_member.rec_lock.space, lock->un_member.rec_lock.page_no,
-					lock_rec_find_set_bit(lock), lock_get_wait_mode(wait), hash_table_name(lock_hash));
 		} else {
 			HASH_INSERT(lock_t, hash, lock_hash, key, lock);
-			fprintf(stderr, "Lock %p(%u,%u,%lu)[%s] appended to hash table %s\n",
-					lock, lock->un_member.rec_lock.space, lock->un_member.rec_lock.page_no,
-					lock_rec_find_set_bit(lock), lock_get_wait_mode(wait), hash_table_name(lock_hash));
 		}
 	}
 
@@ -2803,35 +2794,6 @@ vats_grant(
 			update_dep_size(lock->trx, add_dep_size_total + dep_size_compsensate);
 		}
 	}
-
-	lock = lock_rec_get_first(lock_hash, space, page_no, heap_no);
-	if (lock != NULL && lock_get_wait(lock)) {
-		fprintf(stderr, "Assertion error for lock %p(%lu,%lu,%lu) in hash table %s\n",
-				lock, space, page_no, heap_no, hash_table_name(lock_hash));
-		fprintf(stderr, "Wait locks: [");
-		for (j = 0; j < wait_locks.size(); ++j) {
-			wait_lock = wait_locks[j];
-			if (lock_get_wait(wait_lock)) {
-				fprintf(stderr, "%p,", wait_lock);
-			}
-		}
-		fprintf(stderr, "]\n");
-		fprintf(stderr, "Granted locks: [");
-		for (j = 0; j < granted_locks.size(); ++j) {
-			wait_lock = granted_locks[j];
-			fprintf(stderr, "%p,", wait_lock);
-		}
-		fprintf(stderr, "]\n");
-		fprintf(stderr, "New granted locks: [");
-		for (j = 0; j < wait_locks.size(); ++j) {
-			wait_lock = wait_locks[j];
-			if (!lock_get_wait(wait_lock)) {
-				fprintf(stderr, "%p,", wait_lock);
-			}
-		}
-		fprintf(stderr, "]\n");
-	}
-	ut_a(lock == NULL || !lock_get_wait(lock));
 }
 
 
@@ -2872,10 +2834,6 @@ lock_rec_dequeue_from_page(
 
 	HASH_DELETE(lock_t, hash, lock_hash,
 		    lock_rec_fold(space, page_no), in_lock);
-
-	fprintf(stderr, "Lock %p(%u,%u,%lu) removed from hash table %s\n",
-			in_lock, in_lock->un_member.rec_lock.space, in_lock->un_member.rec_lock.page_no,
-			lock_rec_find_set_bit(in_lock), hash_table_name(lock_hash));
 
 	UT_LIST_REMOVE(trx_lock->trx_locks, in_lock);
 
@@ -7654,13 +7612,6 @@ DeadlockChecker::get_first_lock(ulint* heap_no) const
 		if (!lock_rec_get_nth_bit(lock, *heap_no)) {
 			lock = lock_rec_get_next_const(*heap_no, lock);
 		}
-
-		if (lock_get_wait(lock)) {
-			fprintf(stderr, "Assertion error for lock %p(%u,%u,%lu) in hash table %s\n",
-					lock, lock->un_member.rec_lock.space, lock->un_member.rec_lock.page_no,
-					lock_rec_find_set_bit(lock), hash_table_name(lock_hash));
-		}
-
 		ut_a(!lock_get_wait(lock));
 	} else {
 		/* Table locks don't care about the heap_no. */
