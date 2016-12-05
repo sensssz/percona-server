@@ -1543,7 +1543,7 @@ has_higher_priority(
     if (trx_is_high_priority(lock2->trx)) {
         return false;
     }
-    return lock1->trx->dep_size >= lock2->trx->dep_size;
+    return lock1->trx->dep_size > lock2->trx->dep_size;
 }
 
 static
