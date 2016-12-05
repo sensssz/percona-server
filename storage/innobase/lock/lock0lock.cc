@@ -2803,7 +2803,7 @@ vats_grant(
 	}
 
 	lock = lock_rec_get_first(lock_hash, space, page_no, heap_no);
-	if (lock_get_wait(lock)) {
+	if (lock != NULL && lock_get_wait(lock)) {
 		fprintf(stderr, "Wait locks: [");
 		for (j = 0; j < wait_locks.size(); ++j) {
 			wait_lock = wait_locks[j];
