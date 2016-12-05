@@ -1756,9 +1756,9 @@ RecLock::lock_add(lock_t* lock, bool add_to_hash)
 			HASH_INSERT(lock_t, hash, lock_hash, key, lock);
 		}
 
-		fprintf(stderr, "Lock %p(%u,%u,%lu) inserted to hash table %s\n",
+		fprintf(stderr, "Lock %p(%u,%u,%lu)[%s] inserted to hash table %s\n",
 				lock, lock->un_member.rec_lock.space, lock->un_member.rec_lock.page_no,
-				lock_rec_find_set_bit(lock), hash_table_name(lock_hash));
+				lock_rec_find_set_bit(lock), lock_get_wait_mode(lock), hash_table_name(lock_hash));
 	}
 
 	UT_LIST_ADD_LAST(lock->trx->lock.trx_locks, lock);
