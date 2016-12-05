@@ -1513,20 +1513,6 @@ RecLock::lock_alloc(
 	return(lock);
 }
 
-static
-const char *
-hash_table_name(
-	hash_table_t *lock_hash)
-{
-	if (lock_hash == lock_sys->rec_hash) {
-		return "rec_hash";
-	} else if (lock_hash == lock_sys->prdt_hash) {
-		return "prdt_hash";
-	} else {
-		return "prdt_page_hash";
-	}
-}
-
 /*********************************************************************//**
 Check if lock1 has higher priority than lock2.
 NULL has lowest priority.
@@ -1715,18 +1701,6 @@ update_dep_size(
         }
         update_dep_size(in_lock->trx, total_size_delta);
     }
-}
-
-static
-const char *
-lock_get_wait_mode(
-	bool wait)
-{
-	if (wait) {
-		return "wait";
-	} else {
-		return "granted";
-	}
 }
 
 /**
