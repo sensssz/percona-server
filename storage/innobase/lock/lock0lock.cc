@@ -2812,6 +2812,12 @@ vats_grant(
 			}
 		}
 		fprintf(stderr, "]\n");
+		fprintf(stderr, "Granted locks: [");
+		for (j = 0; j < granted_locks.size(); ++j) {
+			wait_lock = granted_locks[j];
+			fprintf(stderr, "%p,", wait_lock);
+		}
+		fprintf(stderr, "]\n");
 		fprintf(stderr, "New granted locks: [");
 		for (j = 0; j < wait_locks.size(); ++j) {
 			wait_lock = wait_locks[j];
