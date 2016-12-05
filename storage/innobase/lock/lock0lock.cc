@@ -2824,6 +2824,10 @@ lock_rec_dequeue_from_page(
 	HASH_DELETE(lock_t, hash, lock_hash,
 		    lock_rec_fold(space, page_no), in_lock);
 
+	fprintf(stderr, "Lock %p(%lu,%lu,%lu) removed from hash table %s\n",
+			in_lock, in_lock->un_member.rec_lock.space, in_lock->un_member.rec_lock.page_no,
+			lock_rec_find_set_bit(in_lock), hash_table_name(lock_hash));
+
 	UT_LIST_REMOVE(trx_lock->trx_locks, in_lock);
 
 	MONITOR_INC(MONITOR_RECLOCK_REMOVED);
