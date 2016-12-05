@@ -1590,6 +1590,28 @@ lock_rec_get_first(
 
 static
 void
+lock_rec_insert_to_head(
+	hash_table_t *lock_hash,
+    lock_t *lock,
+    ulint   rec_fold)
+{
+	lock_t *next;
+	hash_cell_t* cell;
+
+	// Move the target lock to the head of the list
+	cell = hash_get_nth_cell(lock_hash, hash_calc_hash(rec_fold, lock_hash));
+	fprintf(stderr, "Lock %p(%u,%u,%lu) moved to head of hash table %s\n",
+			lock, lock->un_member.rec_lock.space, lock->un_member.rec_lock.page_no,
+			lock_rec_find_set_bit(lock), hash_table_name(lock_hash));
+	if (lock != cell->node) {
+		next = (lock_t *) cell->node;
+		cell->node = lock;
+		lock->hash = next;
+	}
+}
+
+static
+void
 reset_trx_size_updated()
 {
     trx_t *trx;
@@ -1698,6 +1720,18 @@ update_dep_size(
     }
 }
 
+static
+const char *
+lock_get_wait_mode(
+	lock_t *lock)
+{
+	if (lock_get_wait(lock)) {
+		return "wait";
+	} else {
+		return "granted";
+	}
+}
+
 /**
 Add the lock to the record lock hash and the transaction's lock list
 @param[in,out] lock	Newly created record lock to add to the rec hash
@@ -1708,13 +1742,19 @@ RecLock::lock_add(lock_t* lock, bool add_to_hash)
 	ut_ad(lock_mutex_own());
 	ut_ad(trx_mutex_own(lock->trx));
 
+	bool wait = m_mode & LOCK_WAIT;
+
 	if (add_to_hash) {
 		ulint	key = m_rec_id.fold();
         hash_table_t *lock_hash = lock_hash_get(m_mode);
 
         ++lock->index->table->n_rec_locks;
 
-        HASH_INSERT(lock_t, hash, lock_hash, key, lock);
+		if (use_vats(lock->trx) && !wait) {
+			lock_rec_insert_to_head(lock_hash, lock, key);
+		} else {
+			HASH_INSERT(lock_t, hash, lock_hash, key, lock);
+		}
 
 		fprintf(stderr, "Lock %p(%u,%u,%lu) inserted to hash table %s\n",
 				lock, lock->un_member.rec_lock.space, lock->un_member.rec_lock.page_no,
@@ -1723,7 +1763,7 @@ RecLock::lock_add(lock_t* lock, bool add_to_hash)
 
 	UT_LIST_ADD_LAST(lock->trx->lock.trx_locks, lock);
 
-	if (m_mode & LOCK_WAIT) {
+	if (wait) {
 		lock_set_lock_and_trx_wait(lock, lock->trx);
     } else {
         update_dep_size(lock, lock_rec_find_set_bit(lock), false);
@@ -2681,30 +2721,6 @@ lock_rec_has_to_wait_granted(
 
 static
 void
-lock_rec_move_to_front(
-	hash_table_t *lock_hash,
-    lock_t *lock,
-    ulint   rec_fold)
-{
-	lock_t *next;
-	hash_cell_t* cell;
-
-	// Move the target lock to the head of the list
-	cell = hash_get_nth_cell(lock_hash, hash_calc_hash(rec_fold, lock_hash));
-	fprintf(stderr, "Lock %p(%u,%u,%lu) moved to head of hash table %s\n",
-			lock, lock->un_member.rec_lock.space, lock->un_member.rec_lock.page_no,
-			lock_rec_find_set_bit(lock), hash_table_name(lock_hash));
-	if (lock != cell->node) {
-		HASH_DELETE(lock_t, hash, lock_hash,
-					rec_fold, lock);
-		next = (lock_t *) cell->node;
-		cell->node = lock;
-		lock->hash = next;
-	}
-}
-
-static
-void
 vats_grant(
 	hash_table_t *lock_hash,
     lock_t *released_lock,
@@ -2746,7 +2762,9 @@ vats_grant(
 		if (!lock_rec_has_to_wait_granted(lock, granted_locks)
 			&& !lock_rec_has_to_wait_granted(lock, new_granted)) {
 			lock_grant(lock, false);
-			lock_rec_move_to_front(lock_hash, lock, rec_fold);
+			HASH_DELETE(lock_t, hash, lock_hash,
+						rec_fold, lock);
+			lock_rec_insert_to_head(lock_hash, lock, rec_fold);
 			new_granted.push_back(lock);
 			sub_dep_size_total -= lock->trx->dep_size + 1;
 		} else {
@@ -2783,6 +2801,27 @@ vats_grant(
 			update_dep_size(lock->trx, add_dep_size_total + dep_size_compsensate);
 		}
 	}
+
+	lock = lock_rec_get_first(lock_hash, space, page_no, heap_no);
+	if (lock_get_wait(lock)) {
+		fprintf(stderr, "Wait locks: [");
+		for (j = 0; j < wait_locks.size(); ++j) {
+			wait_lock = wait_locks[j];
+			if (lock_get_wait(wait_lock)) {
+				fprintf(stderr, "%p,", wait_lock);
+			}
+		}
+		fprintf(stderr, "]\n");
+		fprintf(stderr, "New granted locks: [");
+		for (j = 0; j < wait_locks.size(); ++j) {
+			wait_lock = wait_locks[j];
+			if (!lock_get_wait(wait_lock)) {
+				fprintf(stderr, "%p,", wait_lock);
+			}
+		}
+		fprintf(stderr, "]\n");
+	}
+	ut_a(!lock_get_wait(lock));
 }
 
 
