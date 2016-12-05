@@ -1715,6 +1715,8 @@ RecLock::lock_add(lock_t* lock, bool add_to_hash)
         ++lock->index->table->n_rec_locks;
 
         HASH_INSERT(lock_t, hash, lock_hash, key, lock);
+
+		fprintf(stderr, "Lock %p inserted to hash table %s\n", hash_table_name(lock_hash));
 	}
 
 	UT_LIST_ADD_LAST(lock->trx->lock.trx_locks, lock);
@@ -2687,8 +2689,8 @@ lock_rec_move_to_front(
 
 	// Move the target lock to the head of the list
 	cell = hash_get_nth_cell(lock_hash, hash_calc_hash(rec_fold, lock_hash));
+	fprintf(stderr, "Lock %p moved to head of hash table %s\n", lock, hash_table_name(lock_hash));
 	if (lock != cell->node) {
-		fprintf(stderr, "Lock %p moved to head of hash table %s\n", lock, hash_table_name(lock_hash));
 		HASH_DELETE(lock_t, hash, lock_hash,
 					rec_fold, lock);
 		next = (lock_t *) cell->node;
