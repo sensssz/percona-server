@@ -1716,7 +1716,7 @@ RecLock::lock_add(lock_t* lock, bool add_to_hash)
 
         HASH_INSERT(lock_t, hash, lock_hash, key, lock);
 
-		fprintf(stderr, "Lock %p inserted to hash table %s\n", hash_table_name(lock_hash));
+		fprintf(stderr, "Lock %p inserted to hash table %s\n", lock, hash_table_name(lock_hash));
 	}
 
 	UT_LIST_ADD_LAST(lock->trx->lock.trx_locks, lock);
