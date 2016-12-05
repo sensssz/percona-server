@@ -1716,7 +1716,7 @@ RecLock::lock_add(lock_t* lock, bool add_to_hash)
 
         HASH_INSERT(lock_t, hash, lock_hash, key, lock);
 
-		fprintf(stderr, "Lock %p(%lu,%lu,%lu) inserted to hash table %s\n",
+		fprintf(stderr, "Lock %p(%u,%u,%lu) inserted to hash table %s\n",
 				lock, lock->un_member.rec_lock.space, lock->un_member.rec_lock.page_no,
 				lock_rec_find_set_bit(lock), hash_table_name(lock_hash));
 	}
@@ -2691,7 +2691,7 @@ lock_rec_move_to_front(
 
 	// Move the target lock to the head of the list
 	cell = hash_get_nth_cell(lock_hash, hash_calc_hash(rec_fold, lock_hash));
-	fprintf(stderr, "Lock %p(%lu,%lu,%lu) moved to head of hash table %s\n",
+	fprintf(stderr, "Lock %p(%u,%u,%lu) moved to head of hash table %s\n",
 			lock, lock->un_member.rec_lock.space, lock->un_member.rec_lock.page_no,
 			lock_rec_find_set_bit(lock), hash_table_name(lock_hash));
 	if (lock != cell->node) {
@@ -2824,7 +2824,7 @@ lock_rec_dequeue_from_page(
 	HASH_DELETE(lock_t, hash, lock_hash,
 		    lock_rec_fold(space, page_no), in_lock);
 
-	fprintf(stderr, "Lock %p(%lu,%lu,%lu) removed from hash table %s\n",
+	fprintf(stderr, "Lock %p(%u,%u,%lu) removed from hash table %s\n",
 			in_lock, in_lock->un_member.rec_lock.space, in_lock->un_member.rec_lock.page_no,
 			lock_rec_find_set_bit(in_lock), hash_table_name(lock_hash));
 
@@ -7607,7 +7607,7 @@ DeadlockChecker::get_first_lock(ulint* heap_no) const
 		}
 
 		if (lock_get_wait(lock)) {
-			fprintf(stderr, "Assertion error for lock %p(%lu,%lu,%lu) in hash table %s\n",
+			fprintf(stderr, "Assertion error for lock %p(%u,%u,%lu) in hash table %s\n",
 					lock, lock->un_member.rec_lock.space, lock->un_member.rec_lock.page_no,
 					lock_rec_find_set_bit(lock), hash_table_name(lock_hash));
 		}
