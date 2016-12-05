@@ -1752,13 +1752,15 @@ RecLock::lock_add(lock_t* lock, bool add_to_hash)
 
 		if (use_vats(lock->trx) && !wait) {
 			lock_rec_insert_to_head(lock_hash, lock, key);
+			fprintf(stderr, "Lock %p(%u,%u,%lu)[%s] inserted to head of hash table %s\n",
+					lock, lock->un_member.rec_lock.space, lock->un_member.rec_lock.page_no,
+					lock_rec_find_set_bit(lock), lock_get_wait_mode(lock), hash_table_name(lock_hash));
 		} else {
 			HASH_INSERT(lock_t, hash, lock_hash, key, lock);
+			fprintf(stderr, "Lock %p(%u,%u,%lu)[%s] appended to hash table %s\n",
+					lock, lock->un_member.rec_lock.space, lock->un_member.rec_lock.page_no,
+					lock_rec_find_set_bit(lock), lock_get_wait_mode(lock), hash_table_name(lock_hash));
 		}
-
-		fprintf(stderr, "Lock %p(%u,%u,%lu)[%s] inserted to hash table %s\n",
-				lock, lock->un_member.rec_lock.space, lock->un_member.rec_lock.page_no,
-				lock_rec_find_set_bit(lock), lock_get_wait_mode(lock), hash_table_name(lock_hash));
 	}
 
 	UT_LIST_ADD_LAST(lock->trx->lock.trx_locks, lock);
@@ -2804,6 +2806,8 @@ vats_grant(
 
 	lock = lock_rec_get_first(lock_hash, space, page_no, heap_no);
 	if (lock != NULL && lock_get_wait(lock)) {
+		fprintf(stderr, "Assertion error for lock %p(%u,%u,%lu) in hash table %s\n",
+				lock, space, page_no, heap_no, hash_table_name(lock_hash));
 		fprintf(stderr, "Wait locks: [");
 		for (j = 0; j < wait_locks.size(); ++j) {
 			wait_lock = wait_locks[j];
