@@ -2814,7 +2814,7 @@ lock_rec_dequeue_from_page(
 	MONITOR_INC(MONITOR_RECLOCK_REMOVED);
 	MONITOR_DEC(MONITOR_NUM_RECLOCK);
 
-	if (use_vats(in_lock->trx)) {
+	if (!use_vats(in_lock->trx)) {
 
 		/* Check if waiting locks in the queue can now be granted:
 		grant locks if there are no conflicting locks ahead. Stop at
@@ -4635,7 +4635,7 @@ released:
 	ut_a(!lock_get_wait(lock));
     lock_rec_reset_nth_bit(lock, heap_no);
     
-    if (use_vats(trx)) {
+    if (!use_vats(trx)) {
 
         /* Check if we can now grant waiting lock requests */
 
