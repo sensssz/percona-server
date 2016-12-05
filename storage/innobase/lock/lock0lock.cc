@@ -2821,7 +2821,7 @@ vats_grant(
 		}
 		fprintf(stderr, "]\n");
 	}
-	ut_a(!lock_get_wait(lock));
+	ut_a(lock == NULL || !lock_get_wait(lock));
 }
 
 
