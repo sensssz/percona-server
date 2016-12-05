@@ -1716,7 +1716,9 @@ RecLock::lock_add(lock_t* lock, bool add_to_hash)
 
         HASH_INSERT(lock_t, hash, lock_hash, key, lock);
 
-		fprintf(stderr, "Lock %p inserted to hash table %s\n", lock, hash_table_name(lock_hash));
+		fprintf(stderr, "Lock %p(%lu,%lu,%lu) inserted to hash table %s\n",
+				lock, lock->un_member.rec_lock.space, lock->un_member.rec_lock.page_no,
+				lock_rec_find_set_bit(lock), hash_table_name(lock_hash));
 	}
 
 	UT_LIST_ADD_LAST(lock->trx->lock.trx_locks, lock);
@@ -2689,7 +2691,9 @@ lock_rec_move_to_front(
 
 	// Move the target lock to the head of the list
 	cell = hash_get_nth_cell(lock_hash, hash_calc_hash(rec_fold, lock_hash));
-	fprintf(stderr, "Lock %p moved to head of hash table %s\n", lock, hash_table_name(lock_hash));
+	fprintf(stderr, "Lock %p(%lu,%lu,%lu) moved to head of hash table %s\n",
+			lock, lock->un_member.rec_lock.space, lock->un_member.rec_lock.page_no,
+			lock_rec_find_set_bit(lock), hash_table_name(lock_hash));
 	if (lock != cell->node) {
 		HASH_DELETE(lock_t, hash, lock_hash,
 					rec_fold, lock);
@@ -7599,8 +7603,9 @@ DeadlockChecker::get_first_lock(ulint* heap_no) const
 		}
 
 		if (lock_get_wait(lock)) {
-			fprintf(stderr, "Assertion error for lock %p in hash table %s\n",
-					lock, hash_table_name(lock_hash));
+			fprintf(stderr, "Assertion error for lock %p(%lu,%lu,%lu) in hash table %s\n",
+					lock, lock->un_member.rec_lock.space, lock->un_member.rec_lock.page_no,
+					lock_rec_find_set_bit(lock), hash_table_name(lock_hash));
 		}
 
 		ut_a(!lock_get_wait(lock));
