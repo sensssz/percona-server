@@ -2023,6 +2023,7 @@ lock_rec_create(
 	ulint       rec_fold;
 	ulint		n_bits;
 	ulint		n_bytes;
+	bool			wait;
 	const page_t*	page;
 
 	ut_ad(lock_mutex_own());
@@ -2076,6 +2077,8 @@ lock_rec_create(
 
 	index->table->n_rec_locks++;
 	ut_ad(index->table->n_ref_count > 0 || !index->table->can_be_evicted);
+
+	wait = type_mode & LOCK_WAIT;
 	if (use_vats(lock->trx) && !wait) {
 		lock_rec_insert_to_head(lock, rec_fold);
 	} else {
@@ -2090,7 +2093,7 @@ lock_rec_create(
 
 	UT_LIST_ADD_LAST(trx_locks, trx->lock.trx_locks, lock);
 
-	if (type_mode & LOCK_WAIT) {
+	if (wait) {
 		lock_set_lock_and_trx_wait(lock, trx);
 	} else {
 		update_dep_size(lock, heap_no, false);
@@ -2867,6 +2870,7 @@ lock_rec_dequeue_from_page(
 				continue;
 			}
 			vats_grant(in_lock, heap_no);
+		}
 	}
 }
 
