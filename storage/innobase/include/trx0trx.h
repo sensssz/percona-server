@@ -40,10 +40,6 @@ Created 3/26/1996 Heikki Tuuri
 #include "ut0vec.h"
 #include "fts0fts.h"
 
-#include <time.h>
-
-typedef struct timespec timespec;
-
 /** Dummy session used currently in MySQL interface */
 extern sess_t*	trx_dummy_sess;
 
@@ -874,9 +870,8 @@ struct trx_t{
 
 	time_t		start_time;	/*!< time the trx state last time became
 					TRX_STATE_ACTIVE */
-    timespec    start_time_nano;
-    long        dep_size;
-    bool        size_updated;
+	long        dep_size;
+	bool        size_updated;
 	trx_id_t	id;		/*!< transaction id */
 	XID		xid;		/*!< X/Open XA transaction
 					identification to identify a
