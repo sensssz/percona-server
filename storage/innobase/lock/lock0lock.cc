@@ -4589,10 +4589,10 @@ lock_rec_unlock(
 	lock_mode		lock_mode)/*!< in: LOCK_S or LOCK_X */
 {
 	lock_t*		first_lock;
-    lock_t*		lock;
-    ulint		heap_no;
+	lock_t*		lock;
+	ulint		heap_no;
 	const char*	stmt;
-    size_t		stmt_len;
+	size_t		stmt_len;
 
 	ut_ad(trx);
 	ut_ad(rec);
@@ -4633,25 +4633,25 @@ lock_rec_unlock(
 
 released:
 	ut_a(!lock_get_wait(lock));
-    lock_rec_reset_nth_bit(lock, heap_no);
-    
-    if (!use_vats(trx)) {
+	lock_rec_reset_nth_bit(lock, heap_no);
 
-        /* Check if we can now grant waiting lock requests */
+	if (!use_vats(trx)) {
 
-        for (lock = first_lock; lock != NULL;
-             lock = lock_rec_get_next(heap_no, lock)) {
-            if (lock_get_wait(lock)
-                && !lock_rec_has_to_wait_in_queue(lock)) {
+		/* Check if we can now grant waiting lock requests */
 
-                /* Grant the lock */
-                ut_ad(trx != lock->trx);
-                lock_grant(lock, false);
-            }
-        }
-    } else {
-        vats_grant(lock_sys->rec_hash, lock, heap_no);
-    }
+		for (lock = first_lock; lock != NULL;
+			 lock = lock_rec_get_next(heap_no, lock)) {
+			if (lock_get_wait(lock)
+				&& !lock_rec_has_to_wait_in_queue(lock)) {
+
+				/* Grant the lock */
+				ut_ad(trx != lock->trx);
+				lock_grant(lock, false);
+			}
+		}
+	} else {
+		vats_grant(lock_sys->rec_hash, lock, heap_no);
+	}
 
 	lock_mutex_exit();
 	trx_mutex_exit(trx);
