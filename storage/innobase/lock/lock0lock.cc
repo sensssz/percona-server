@@ -1844,67 +1844,6 @@ has_higher_priority(
 }
 
 static
-dberr_t
-lock_rec_insert_by_trx_age(
-  lock_t *in_lock,
-  bool wait)
-{
-    ulint               space;
-    ulint               page_no;
-    ulint				rec_fold;
-    hash_table_t*       hash;
-    hash_cell_t*        cell;
-    lock_t*				node;
-    lock_t*				next;
-
-    space = in_lock->un_member.rec_lock.space;
-    page_no = in_lock->un_member.rec_lock.page_no;
-    rec_fold = lock_rec_fold(space, page_no);
-    hash = lock_sys->rec_hash;
-    cell = hash_get_nth_cell(hash,
-                             hash_calc_hash(rec_fold, hash));
-
-    node = (lock_t *) cell->node;
-    // If in_lock is not a wait lock, we insert it to the head of the list.
-    if (node == NULL || !lock_get_wait(in_lock) || has_higher_priority(in_lock, node)) {
-        cell->node = in_lock;
-        in_lock->hash = node;
-        return DB_SUCCESS;
-    }
-    while (node != NULL && has_higher_priority((lock_t *) node->hash,
-                                               in_lock)) {
-        node = (lock_t *) node->hash;
-    }
-    next = (lock_t *) node->hash;
-    node->hash = in_lock;
-    in_lock->hash = next;
-    
-    return DB_SUCCESS;
-}
-
-static
-void
-lock_rec_insert_to_head(
-	lock_t *in_lock,   /*!< in: lock to be insert */
-    ulint   rec_fold)  /*!< in: rec_fold of the page */
-{
-    hash_cell_t*        cell;
-    lock_t*				node;
-    
-    if (in_lock == NULL) {
-        return;
-    }
-
-    cell = hash_get_nth_cell(lock_sys->rec_hash,
-                             hash_calc_hash(rec_fold, lock_sys->rec_hash));
-    node = (lock_t *) cell->node;
-    if (node != in_lock) {
-        cell->node = in_lock;
-        in_lock->hash = node;
-    }
-}
-
-static
 bool
 use_vats(
     trx_t *trx)
@@ -1929,6 +1868,27 @@ lock_rec_get_first(
     }
 
     return lock;
+}
+
+static
+void
+lock_rec_insert_to_head(
+    lock_t *lock_to_move,
+    ulint   rec_fold)
+{
+    if (lock_to_move == NULL)
+    {
+		return;
+    }
+
+	// Move the target lock to the head of the list
+	hash_cell_t* cell = hash_get_nth_cell(lock_sys->rec_hash,
+										  hash_calc_hash(rec_fold, lock_sys->rec_hash));
+	if (lock_to_move != cell->node) {
+		lock_t *next = (lock_t *) cell->node;
+		cell->node = lock_to_move;
+		lock_to_move->hash = next;
+	}
 }
 
 static
