@@ -1531,6 +1531,10 @@ has_higher_priority(
 	} else if (lock2 == NULL) {
 		return true;
 	}
+	if (trx_is_high_priority(lock1->trx)
+	 && trx_is_high_priority(lock2->trx)) {
+		return lock1->trx->seq < lock2->trx->seq;
+	}
 	if (trx_is_high_priority(lock1->trx)) {
 		return true;
 	}
