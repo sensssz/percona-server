@@ -25,6 +25,7 @@ Created 5/7/1996 Heikki Tuuri
 
 #define LOCK_MODULE_IMPLEMENTATION
 
+#include <sql_class.h>
 #include <mysql/service_thd_engine_lock.h>
 #include "ha_prototypes.h"
 
@@ -49,7 +50,9 @@ Created 5/7/1996 Heikki Tuuri
 #include "row0mysql.h"
 #include "pars0pars.h"
 
+#include <algorithm>
 #include <set>
+#include <vector>
 
 /* Flag to enable/disable deadlock detector. */
 my_bool	innobase_deadlock_detect = TRUE;
@@ -68,6 +71,25 @@ static const ulint	TABLE_LOCK_CACHE = 8;
 
 /** Size in bytes, of the table lock instance */
 static const ulint	TABLE_LOCK_SIZE = sizeof(ib_lock_t);
+
+/*********************************************************************//**
+Checks if a waiting record lock request still has to wait in a queue.
+@return lock that is causing the wait */
+static
+const lock_t*
+lock_rec_has_to_wait_in_queue(
+/*==========================*/
+  const lock_t*	wait_lock);	/*!< in: waiting record lock */
+
+/*************************************************************//**
+Grants a lock to a waiting lock request and releases the waiting transaction.
+The caller must hold lock_sys->mutex. */
+static
+void
+lock_grant(
+/*=======*/
+	lock_t*	lock,	/*!< in/out: waiting lock request */
+    bool    owns_trx_mutex);    /*!< in: whether lock->trx->mutex is owned */
 
 /** Deadlock checker. */
 class DeadlockChecker {
@@ -1494,10 +1516,12 @@ RecLock::lock_alloc(
 /*********************************************************************//**
 Check if lock1 has higher priority than lock2.
 NULL has lowest priority.
+If either is a high priority transaction, the lock has higher priority.
 If neither of them is wait lock, the first one has higher priority.
 If only one of them is a wait lock, it has lower priority.
 Otherwise, the one with an older transaction has higher priority.
 @returns true if lock1 has higher priority, false otherwise. */
+static
 bool
 has_higher_priority(
 	lock_t *lock1,
@@ -1513,48 +1537,170 @@ has_higher_priority(
 	} else if (!lock_get_wait(lock2)) {
 		return false;
 	}
-	return lock1->trx->start_time < lock2->trx->start_time;
+	if (trx_is_high_priority(lock1->trx)) {
+		return true;
+	}
+	if (trx_is_high_priority(lock2->trx)) {
+		return false;
+	}
+	return lock1->trx->dep_size > lock2->trx->dep_size;
 }
 
-/*********************************************************************//**
-Insert a lock to the hash list according to the mode (whether it is a wait
-lock) and the age of the transaction the it is associated with.
-If the lock is not a wait lock, insert it to the head of the hash list.
-Otherwise, insert it to the middle of the wait locks according to the age of
-the transaciton. */
+static
+bool
+use_vats(
+    trx_t *trx)
+{
+    return innodb_lock_schedule_algorithm ==
+		   INNODB_LOCK_SCHEDULE_ALGORITHM_VATS
+		&& !thd_is_replication_slave_thread(trx->mysql_thd);
+}
+
+static
+lock_t *
+lock_rec_get_first(
+    hash_table_t *hash,
+    ulint   space,
+    ulint   page_no,
+    ulint   heap_no)
+{
+	lock_t *lock;
+
+	lock = lock_rec_get_first_on_page_addr(hash, space, page_no);
+	if (lock != NULL && !lock_rec_get_nth_bit(lock, heap_no)) {
+		lock = lock_rec_get_next(heap_no, lock);
+	}
+
+	return lock;
+}
+
 static
 void
-lock_rec_insert_by_trx_age(
-	lock_t *in_lock, /*!< in: lock to be insert */
-	bool wait)	 /*!< in: whether it's a wait lock */
+lock_rec_insert_to_head(
+	hash_table_t *lock_hash,
+    lock_t *lock,
+    ulint   rec_fold)
 {
-	ulint					space;
-	ulint					page_no;
-	ulint					rec_fold;
-	hash_cell_t*	cell;
-	lock_t*				node;
-	lock_t*				next;
+	lock_t *next;
+	hash_cell_t* cell;
+
+	// Move the target lock to the head of the list
+	cell = hash_get_nth_cell(lock_hash, hash_calc_hash(rec_fold, lock_hash));
+	if (lock != cell->node) {
+		next = (lock_t *) cell->node;
+		cell->node = lock;
+		lock->hash = next;
+	}
+}
+
+static
+void
+reset_trx_size_updated()
+{
+	trx_t *trx;
+	for (trx = UT_LIST_GET_FIRST(trx_sys->rw_trx_list);
+		 trx != NULL;
+		 trx = UT_LIST_GET_NEXT(trx_list, trx)) {
+		trx->size_updated = false;
+	}
+	for (trx = UT_LIST_GET_FIRST(trx_sys->mysql_trx_list);
+		 trx != NULL;
+		 trx = UT_LIST_GET_NEXT(trx_list, trx)) {
+		trx->size_updated = false;
+	}
+}
+
+static
+void
+update_dep_size(
+    trx_t  *trx,
+    long    size_delta,
+    long    depth=1)
+{
+	ulint   space;
+	ulint   page_no;
+	ulint   heap_no;
+	lock_t *lock;
+	lock_t *wait_lock;
+	hash_table_t *lock_hash;
+
+	if (!use_vats(trx) || trx->size_updated || size_delta == 0) {
+		return;
+	}
+
+	trx->size_updated = true;
+	trx->dep_size += size_delta;
+	if (trx->dep_size < 0) {
+		trx->dep_size = 0;
+	}
+	wait_lock = trx->lock.wait_lock;
+	if (trx->state != TRX_STATE_ACTIVE
+		|| wait_lock == NULL) {
+		if (depth == 1) {
+			reset_trx_size_updated();
+		}
+		return;
+	}
+
+	space = wait_lock->un_member.rec_lock.space;
+	page_no = wait_lock->un_member.rec_lock.page_no;
+	heap_no = lock_rec_find_set_bit(wait_lock);
+	lock_hash = lock_hash_get(wait_lock->type_mode);
+	for (lock = lock_rec_get_first(lock_hash, space, page_no, heap_no);
+		 lock != NULL;
+		 lock = lock_rec_get_next(heap_no, lock)) {
+		if (!lock_get_wait(lock)
+			&& trx != lock->trx) {
+			update_dep_size(lock->trx, size_delta, depth + 1);
+		}
+	}
+	if (depth == 1) {
+		reset_trx_size_updated();
+	}
+}
+
+static
+void
+update_dep_size(
+    lock_t *in_lock,
+    ulint   heap_no,
+    bool    wait)
+{
+	lock_t *lock;
+	ulint   space;
+	ulint   page_no;
+	long    total_size_delta;
+	hash_table_t *lock_hash;
+
+	if (!use_vats(in_lock->trx)) {
+		return;
+	}
 
 	space = in_lock->un_member.rec_lock.space;
 	page_no = in_lock->un_member.rec_lock.page_no;
-	rec_fold = lock_rec_fold(space, page_no);
-	cell = hash_get_nth_cell(lock_sys->rec_hash,
-				 hash_calc_hash(rec_fold, lock_sys->rec_hash));
+	lock_hash = lock_hash_get(in_lock->type_mode);
 
-	node = (lock_t *) cell->node;
-	// If in_lock is not a wait lock, we insert it to the head of the list.
-	if (node == NULL || !wait || has_higher_priority(in_lock, node)) {
-		cell->node = in_lock;
-		in_lock->hash = node;
-		return;
+	if (wait) {
+		for (lock = lock_rec_get_first(lock_hash, space, page_no, heap_no);
+			 lock != NULL;
+			 lock = lock_rec_get_next(heap_no, lock)) {
+			if (!lock_get_wait(lock)
+				&& in_lock->trx != lock->trx) {
+				update_dep_size(lock->trx, in_lock->trx->dep_size + 1);
+			}
+		}
+	} else {
+		total_size_delta = 0;
+		for (lock = lock_rec_get_first(lock_hash, space, page_no, heap_no);
+			 lock != NULL;
+			 lock = lock_rec_get_next(heap_no, lock)) {
+			if (lock_get_wait(lock)
+				&& in_lock->trx != lock->trx) {
+				total_size_delta += lock->trx->dep_size + 1;
+			}
+		}
+		update_dep_size(in_lock->trx, total_size_delta);
 	}
-	while (node != NULL && has_higher_priority((lock_t *) node->hash,
-						   in_lock)) {
-		node = (lock_t *) node->hash;
-	}
-	next = (lock_t *) node->hash;
-	node->hash = in_lock;
-	in_lock->hash = next;
 }
 
 /**
@@ -1567,19 +1713,28 @@ RecLock::lock_add(lock_t* lock, bool add_to_hash)
 	ut_ad(lock_mutex_own());
 	ut_ad(trx_mutex_own(lock->trx));
 
+	bool wait = m_mode & LOCK_WAIT;
+
 	if (add_to_hash) {
 		ulint	key = m_rec_id.fold();
+        hash_table_t *lock_hash = lock_hash_get(m_mode);
 
-		++lock->index->table->n_rec_locks;
+        ++lock->index->table->n_rec_locks;
 
-		HASH_INSERT(lock_t, hash, lock_hash_get(m_mode), key, lock);
-	}
-
-	if (m_mode & LOCK_WAIT) {
-		lock_set_lock_and_trx_wait(lock, lock->trx);
+		if (use_vats(lock->trx) && !wait) {
+			lock_rec_insert_to_head(lock_hash, lock, key);
+		} else {
+			HASH_INSERT(lock_t, hash, lock_hash, key, lock);
+		}
 	}
 
 	UT_LIST_ADD_LAST(lock->trx->lock.trx_locks, lock);
+
+	if (wait) {
+		lock_set_lock_and_trx_wait(lock, lock->trx);
+    } else {
+        update_dep_size(lock, lock_rec_find_set_bit(lock), false);
+    }
 }
 
 /**
@@ -1591,9 +1746,9 @@ Create a new lock.
 @return a new lock instance */
 lock_t*
 RecLock::create(
-	trx_t*	trx,
-	bool	owns_trx_mutex,
-	bool	add_to_hash,
+	trx_t*  trx,
+	bool		owns_trx_mutex,
+	bool		add_to_hash,
 	const	lock_prdt_t* prdt)
 {
 	ut_ad(lock_mutex_own());
@@ -1621,7 +1776,7 @@ RecLock::create(
 	if (!owns_trx_mutex) {
 		trx_mutex_exit(trx);
 	}
-
+    
 	return(lock);
 }
 
@@ -1648,32 +1803,13 @@ RecLock::check_deadlock_result(const trx_t* victim_trx, lock_t* lock)
 		return(DB_DEADLOCK);
 
 	} else if (m_trx->lock.wait_lock == NULL) {
-
-		/* If there was a deadlock but we chose another
-		transaction as a victim, it is possible that we
-		already have the lock now granted! */
-
-		return(DB_SUCCESS_LOCKED_REC);
-	}
-
-	// Move it only when it does not cause a deadlock.
-	if (innodb_lock_schedule_algorithm
-	    == INNODB_LOCK_SCHEDULE_ALGORITHM_VATS) {
-
-		// TODO VATS
-		ut_ad(!(m_mode & LOCK_PREDICATE));
-		ut_ad(!(m_mode & LOCK_PRDT_PAGE));
-		ut_ad(lock_hash_get(lock->type_mode) == lock_sys->rec_hash);
-
-		const ulint space = lock->un_member.rec_lock.space;
-		const ulint page_no = lock->un_member.rec_lock.page_no;
-
-		HASH_DELETE(lock_t, hash, lock_sys->rec_hash,
-			    lock_rec_fold(space, page_no), lock);
-		lock_rec_insert_by_trx_age(lock, true);
-	}
-
-
+        
+        /* If there was a deadlock but we chose another
+         transaction as a victim, it is possible that we
+         already have the lock now granted! */
+        
+        return(DB_SUCCESS_LOCKED_REC);
+    }
 	return(DB_LOCK_WAIT);
 }
 
@@ -1824,9 +1960,11 @@ RecLock::add_to_waitq(const lock_t* wait_for, const lock_prdt_t* prdt)
 
 	ut_ad(lock_get_wait(lock));
 
-	dberr_t	err = deadlock_check(lock);
+    dberr_t	err = deadlock_check(lock);
 
-	ut_ad(trx_mutex_own(m_trx));
+    ut_ad(trx_mutex_own(m_trx));
+
+    update_dep_size(lock, lock_rec_find_set_bit(lock), err == DB_LOCK_WAIT || err == DB_DEADLOCK);
 
 	/* m_trx->mysql_thd is NULL if it's an internal trx. So current_thd is used */
 	if (err == DB_LOCK_WAIT) {
@@ -1927,7 +2065,8 @@ lock_rec_add_to_queue(
 
 		if (lock != NULL) {
 
-			lock_rec_set_nth_bit(lock, heap_no);
+            lock_rec_set_nth_bit(lock, heap_no);
+            update_dep_size(lock, heap_no, false);
 
 			return;
 		}
@@ -2010,7 +2149,8 @@ lock_rec_lock_fast(
 			set */
 			if (!lock_rec_get_nth_bit(lock, heap_no)) {
 				lock_rec_set_nth_bit(lock, heap_no);
-				status = LOCK_REC_SUCCESS_CREATED;
+                status = LOCK_REC_SUCCESS_CREATED;
+                update_dep_size(lock, heap_no, false);
 			}
 		}
 
@@ -2211,18 +2351,22 @@ lock_rec_has_to_wait_in_queue(
 
 /*************************************************************//**
 Grants a lock to a waiting lock request and releases the waiting transaction.
-The caller must hold lock_sys->mutex but not lock->trx->mutex. */
+The caller must hold lock_sys->mutex. */
 static
 void
 lock_grant(
 /*=======*/
-	lock_t*	lock)	/*!< in/out: waiting lock request */
+	lock_t*	lock,	/*!< in/out: waiting lock request */
+    bool    owns_trx_mutex)    /*!< in: whether lock->trx->mutex is owned */
 {
-	ut_ad(lock_mutex_own());
+    ut_ad(lock_mutex_own());
+    ut_ad(trx_mutex_own(lock->trx) == owns_trx_mutex);
 
 	lock_reset_lock_and_trx_wait(lock);
 
-	trx_mutex_enter(lock->trx);
+    if (!owns_trx_mutex) {
+        trx_mutex_enter(lock->trx);
+    }
 
 	if (lock_get_mode(lock) == LOCK_AUTO_INC) {
 		dict_table_t*	table = lock->un_member.tab_lock.table;
@@ -2254,8 +2398,10 @@ lock_grant(
 			lock_wait_release_thread_if_suspended(thr);
 		}
 	}
-
-	trx_mutex_exit(lock->trx);
+    
+    if (!owns_trx_mutex) {
+        trx_mutex_exit(lock->trx);
+    }
 }
 
 /**
@@ -2519,6 +2665,112 @@ lock_rec_cancel(
 	trx_mutex_exit(lock->trx);
 }
 
+/*********************************************************************//**
+Checks if a waiting record lock request still has to for granted locks.
+@return	lock that is causing the wait */
+static
+const lock_t*
+lock_rec_has_to_wait_granted(
+/*==========================*/
+	const lock_t*	wait_lock,	/*!< in: waiting record lock */
+    std::vector<lock_t *>   &granted_locks)  /*!< in: granted record lock */
+{
+	ulint   i;
+	lock_t *lock;
+	for (i = 0; i < granted_locks.size(); ++i) {
+		lock = granted_locks[i];
+		if (lock_has_to_wait(wait_lock, lock)) {
+			return lock;
+		}
+	}
+	return NULL;
+}
+
+static
+void
+vats_grant(
+	hash_table_t *lock_hash,
+    lock_t *released_lock,
+    ulint   heap_no)
+{
+	ulint		space;
+	ulint		page_no;
+	ulint       rec_fold;
+	ulint       i;
+	ulint       j;
+	long        sub_dep_size_total;
+	long        add_dep_size_total;
+	long        dep_size_compsensate;
+	lock_t*		lock;
+	lock_t*		wait_lock;
+	lock_t*		new_granted_lock;
+	std::vector<lock_t *> wait_locks;
+	std::vector<lock_t *> granted_locks;
+	std::vector<lock_t *> new_granted;
+
+	sub_dep_size_total = 0;
+	add_dep_size_total = 0;
+	space = released_lock->un_member.rec_lock.space;
+	page_no = released_lock->un_member.rec_lock.page_no;
+	rec_fold = lock_rec_fold(space, page_no);
+	for (lock = lock_rec_get_first(lock_hash, space, page_no, heap_no);
+		 lock != NULL;
+		 lock = lock_rec_get_next(heap_no, lock)) {
+		if (!lock_get_wait(lock)) {
+			granted_locks.push_back(lock);
+		} else {
+			wait_locks.push_back(lock);
+		}
+	}
+
+	std::sort(wait_locks.begin(), wait_locks.end(), has_higher_priority);
+	for (i = 0; i < wait_locks.size(); ++i) {
+		lock = wait_locks[i];
+		if (!lock_rec_has_to_wait_granted(lock, granted_locks)
+			&& !lock_rec_has_to_wait_granted(lock, new_granted)) {
+			lock_grant(lock, false);
+			HASH_DELETE(lock_t, hash, lock_hash,
+						rec_fold, lock);
+			lock_rec_insert_to_head(lock_hash, lock, rec_fold);
+			new_granted.push_back(lock);
+			sub_dep_size_total -= lock->trx->dep_size + 1;
+		} else {
+			add_dep_size_total += lock->trx->dep_size + 1;
+		}
+	}
+	if (lock_get_wait(released_lock)) {
+		sub_dep_size_total -= released_lock->trx->dep_size + 1;
+	}
+	for (i = 0; i < granted_locks.size(); ++i) {
+		lock = granted_locks[i];
+		dep_size_compsensate = 0;
+		for (j = 0; j < new_granted.size(); ++j) {
+			new_granted_lock = new_granted[j];
+			if (lock->trx == new_granted_lock->trx) {
+				dep_size_compsensate += lock->trx->dep_size + 1;
+			}
+		}
+		if (lock->trx != released_lock->trx) {
+			update_dep_size(lock->trx, sub_dep_size_total + dep_size_compsensate);
+		}
+	}
+	for (i = 0; i < new_granted.size(); ++i) {
+		lock = new_granted[i];
+		dep_size_compsensate = 0;
+		for (j = 0; j < wait_locks.size(); ++j) {
+			wait_lock = wait_locks[j];
+			if (lock_get_wait(wait_lock)
+				&& lock->trx == wait_lock->trx) {
+				dep_size_compsensate -= lock->trx->dep_size + 1;
+			}
+		}
+		if (lock->trx != released_lock->trx) {
+			update_dep_size(lock->trx, add_dep_size_total + dep_size_compsensate);
+		}
+	}
+}
+
+
 /*************************************************************//**
 Move the lock to the head of the hash list. */
 static
@@ -2555,13 +2807,12 @@ lock_rec_dequeue_from_page(
 					get their lock requests granted,
 					if they are now qualified to it */
 {
-	ulint		space;
-	ulint		page_no;
-	ulint 		rec_fold;
-	lock_t*		lock;
-	lock_t*		previous = NULL;
-	trx_lock_t*	trx_lock;
-	hash_table_t*	lock_hash;
+    ulint		space;
+    ulint		page_no;
+    ulint       heap_no;
+    lock_t*		lock;
+    trx_lock_t*	trx_lock;
+    hash_table_t*	lock_hash;
 
 	ut_ad(lock_mutex_own());
 	ut_ad(lock_get_type_low(in_lock) == LOCK_REC);
@@ -2571,7 +2822,6 @@ lock_rec_dequeue_from_page(
 
 	space = in_lock->un_member.rec_lock.space;
 	page_no = in_lock->un_member.rec_lock.page_no;
-	rec_fold = lock_rec_fold(space, page_no);
 
 	ut_ad(in_lock->index->table->n_rec_locks > 0);
 	in_lock->index->table->n_rec_locks--;
@@ -2586,8 +2836,7 @@ lock_rec_dequeue_from_page(
 	MONITOR_INC(MONITOR_RECLOCK_REMOVED);
 	MONITOR_DEC(MONITOR_NUM_RECLOCK);
 
-	if (innodb_lock_schedule_algorithm
-	    == INNODB_LOCK_SCHEDULE_ALGORITHM_FCFS) {
+	if (!use_vats(in_lock->trx)) {
 
 		/* Check if waiting locks in the queue can now be granted:
 		grant locks if there are no conflicting locks ahead. Stop at
@@ -2603,40 +2852,15 @@ lock_rec_dequeue_from_page(
 
 				/* Grant the lock */
 				ut_ad(lock->trx != in_lock->trx);
-				lock_grant(lock);
+				lock_grant(lock, false);
 			}
 		}
-	} else {
-		// TODO VATS
-		ut_ad(lock_hash == lock_sys->rec_hash);
-		/* Grant locks if there are no conflicting locks ahead.
-		Move granted locks to the head of the list. */
-		for (lock = lock_rec_get_first_on_page_addr(lock_hash, space,
-							    page_no);
-		     lock != NULL;) {
-
-			/* If the lock is a wait lock on this page, and it does not need to wait. */
-			if ((lock->un_member.rec_lock.space == space)
-			    && (lock->un_member.rec_lock.page_no == page_no)
-			    && lock_get_wait(lock)
-			    && !lock_rec_has_to_wait_in_queue(lock)) {
-
-				lock_grant(lock);
-
-				if (previous != NULL) {
-					/* Move the lock to the head of the list. */
-					HASH_GET_NEXT(hash, previous) = HASH_GET_NEXT(hash, lock);
-					lock_rec_move_to_front(lock, rec_fold);
-				} else {
-					/* Already at the head of the list. */
-					previous = lock;
-				}
-				/* Move on to the next lock. */
-				lock = static_cast<lock_t *>(HASH_GET_NEXT(hash, previous));
-			} else {
-				previous = lock;
-				lock = static_cast<lock_t *>(HASH_GET_NEXT(hash, lock));
+    } else {
+		for (heap_no = 0; heap_no < lock_rec_get_n_bits(in_lock); ++heap_no) {
+			if (!lock_rec_get_nth_bit(in_lock, heap_no)) {
+				continue;
 			}
+			vats_grant(lock_hash, in_lock, heap_no);
 		}
 	}
 }
@@ -4289,7 +4513,7 @@ lock_table_dequeue(
 
 			/* Grant the lock */
 			ut_ad(in_lock->trx != lock->trx);
-			lock_grant(lock);
+			lock_grant(lock, false);
 		}
 	}
 }
@@ -4373,7 +4597,6 @@ run_again:
 }
 
 /*=========================== LOCK RELEASE ==============================*/
-
 /*************************************************************//**
 Removes a granted record lock of a transaction from the queue and grants
 locks to other transactions waiting in the queue if they now are entitled
@@ -4434,17 +4657,22 @@ released:
 	ut_a(!lock_get_wait(lock));
 	lock_rec_reset_nth_bit(lock, heap_no);
 
-	/* Check if we can now grant waiting lock requests */
+	if (!use_vats(trx)) {
 
-	for (lock = first_lock; lock != NULL;
-	     lock = lock_rec_get_next(heap_no, lock)) {
-		if (lock_get_wait(lock)
-		    && !lock_rec_has_to_wait_in_queue(lock)) {
+		/* Check if we can now grant waiting lock requests */
 
-			/* Grant the lock */
-			ut_ad(trx != lock->trx);
-			lock_grant(lock);
+		for (lock = first_lock; lock != NULL;
+			 lock = lock_rec_get_next(heap_no, lock)) {
+			if (lock_get_wait(lock)
+				&& !lock_rec_has_to_wait_in_queue(lock)) {
+
+				/* Grant the lock */
+				ut_ad(trx != lock->trx);
+				lock_grant(lock, false);
+			}
 		}
+	} else {
+		vats_grant(lock_sys->rec_hash, lock, heap_no);
 	}
 
 	lock_mutex_exit();
@@ -5656,7 +5884,7 @@ lock_rec_queue_validate(
 			// not need to wait.
 			ut_a(lock_rec_has_to_wait_in_queue(lock));
 		}
-	}
+    }
 
 func_exit:
 	if (!locked_lock_trx_sys) {
@@ -7385,7 +7613,6 @@ DeadlockChecker::get_first_lock(ulint* heap_no) const
 		if (!lock_rec_get_nth_bit(lock, *heap_no)) {
 			lock = lock_rec_get_next_const(*heap_no, lock);
 		}
-
 		ut_a(!lock_get_wait(lock));
 	} else {
 		/* Table locks don't care about the heap_no. */
@@ -7398,9 +7625,7 @@ DeadlockChecker::get_first_lock(ulint* heap_no) const
 	/* Must find at least two locks, otherwise there cannot be a
 	waiting lock, secondly the first lock cannot be the wait_lock. */
 	ut_a(lock != NULL);
-	ut_a(lock != m_wait_lock ||
-	     (innodb_lock_schedule_algorithm
-	      == INNODB_LOCK_SCHEDULE_ALGORITHM_VATS));
+	ut_a(lock != m_wait_lock || use_vats(lock->trx));
 
 	/* Check that the lock type doesn't change. */
 	ut_ad(lock_get_type_low(lock) == lock_get_type_low(m_wait_lock));
