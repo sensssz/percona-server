@@ -1515,6 +1515,7 @@ trx_start_low(
 	}
 	trx->dep_size = 0;
 	trx->size_updated = false;
+	trx->seq = 0;
 
 	ut_a(trx->error_state == DB_SUCCESS);
 
