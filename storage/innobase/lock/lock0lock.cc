@@ -1719,13 +1719,13 @@ RecLock::lock_add(lock_t* lock, bool add_to_hash)
 		ulint	key = m_rec_id.fold();
         hash_table_t *lock_hash = lock_hash_get(m_mode);
 
-		++lock->index->table->n_rec_locks;
+        ++lock->index->table->n_rec_locks;
 
-		HASH_INSERT(lock_t, hash, lock_hash_get(m_mode), key, lock);
-	}
-
-	if (wait_lock) {
-		lock_set_lock_and_trx_wait(lock, lock->trx);
+		if (use_vats(lock->trx) && !wait) {
+			lock_rec_insert_to_head(lock_hash, lock, key);
+		} else {
+			HASH_INSERT(lock_t, hash, lock_hash, key, lock);
+		}
 	}
 
 	UT_LIST_ADD_LAST(lock->trx->lock.trx_locks, lock);
@@ -1802,40 +1802,14 @@ RecLock::check_deadlock_result(const trx_t* victim_trx, lock_t* lock)
 
 		return(DB_DEADLOCK);
 
-	}
-    
-    // Move it only when it does not cause a deadlock.
-    if (innodb_lock_schedule_algorithm
-        == INNODB_LOCK_SCHEDULE_ALGORITHM_VATS
-        && !is_slave_replication
-        && !trx_is_high_priority(lock->trx)) {
+	} else if (m_trx->lock.wait_lock == NULL) {
         
-        HASH_DELETE(lock_t, hash, lock_hash_get(lock->type_mode),
-                    m_rec_id.fold(), lock);
-        lock_rec_insert_by_trx_age(lock, m_mode & LOCK_WAIT);
-        if (lock_get_wait(lock) && !lock_rec_has_to_wait_in_queue(lock)) {
-            lock_reset_lock_and_trx_wait(lock);
-            return DB_SUCCESS_LOCKED_REC;
-        }
+        /* If there was a deadlock but we chose another
+         transaction as a victim, it is possible that we
+         already have the lock now granted! */
+        
+        return(DB_SUCCESS_LOCKED_REC);
     }
-
-	// Move it only when it does not cause a deadlock.
-	if (innodb_lock_schedule_algorithm
-	    == INNODB_LOCK_SCHEDULE_ALGORITHM_VATS) {
-
-		// TODO VATS
-		ut_ad(!(m_mode & LOCK_PREDICATE));
-		ut_ad(!(m_mode & LOCK_PRDT_PAGE));
-//		ut_ad(lock_hash_get(lock->type_mode) == lock_sys->rec_hash);
-
-		const ulint space = lock->un_member.rec_lock.space;
-		const ulint page_no = lock->un_member.rec_lock.page_no;
-
-		HASH_DELETE(lock_t, hash, lock_hash_get(lock->type_mode),
-			    lock_rec_fold(space, page_no), lock);
-		lock_rec_insert_by_trx_age(lock, true);
-	}
-
 	return(DB_LOCK_WAIT);
 }
 
