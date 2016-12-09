@@ -35,7 +35,6 @@
 #include "parse_tree_nodes.h"                // PT_select_var
 #include "rpl_filter.h"                      // binlog_filter
 #include "rpl_rli.h"                         // Relay_log_info
-#include "rpl_gtid.h"                        // Gtid
 #include "sp_cache.h"                        // sp_cache_clear
 #include "sp_rcontext.h"                     // sp_rcontext
 #include "sql_audit.h"                       // mysql_audit_release
