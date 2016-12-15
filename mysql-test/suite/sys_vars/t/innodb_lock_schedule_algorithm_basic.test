@@ -11,4 +11,4 @@ SET GLOBAL innodb_lock_schedule_algorithm = 'VATS';
 SELECT @@global.innodb_lock_schedule_algorithm;
 
 # Reset state
-SET GLOBAL innodb_lock_schedule_algorithm = 'FCFS';
+SET GLOBAL innodb_lock_schedule_algorithm = 'VATS';
